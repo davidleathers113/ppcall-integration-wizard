@@ -37,7 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
           <span>PPCall Studio</span>
         </h1>
       </div>
-      
+
       <nav className="px-4 pb-4 md:flex-1 md:py-4 overflow-x-auto">
         <ul className="flex gap-2 md:block md:space-y-1">
           {menuItems.map((item) => {
@@ -46,10 +46,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
             return (
               <li key={item.id} className="shrink-0 md:shrink">
                 <button
+                  data-testid={`nav-${item.id}`}
                   onClick={() => setView(item.id)}
                   className={`w-full flex items-center gap-2 md:gap-3 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    isActive 
-                      ? "bg-purple-600 text-white" 
+                    isActive
+                      ? "bg-purple-600 text-white"
                       : "hover:bg-slate-800 hover:text-white text-slate-400"
                   }`}
                 >

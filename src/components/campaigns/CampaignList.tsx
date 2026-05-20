@@ -23,13 +23,13 @@ const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
   };
   
   return (
-    <div className="space-y-6">
+    <div data-testid="campaigns-page" className="space-y-6">
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Campaigns</h2>
           <p className="text-slate-500">Manage your PPCall campaigns and their routing configurations.</p>
         </div>
-        <button onClick={handleCreateCampaign} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+        <button data-testid="create-campaign-button" onClick={handleCreateCampaign} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
           <Plus size={18} />
           Create Campaign
         </button>
@@ -56,7 +56,7 @@ const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
                 const buyerCount = campaignIntegrations.filter(i => i.direction === "buyer").length;
 
                 return (
-                  <tr key={campaign.id} className="hover:bg-slate-50 transition-colors group">
+                  <tr data-testid="campaign-row" key={campaign.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       <button 
                         onClick={() => onSelectCampaign(campaign.id)}

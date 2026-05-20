@@ -181,10 +181,10 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Campaign + Integration Name</h3>
             <label className="block text-xs font-bold text-slate-500 uppercase">Integration Name
-              <input className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={integrationName} onChange={event => setIntegrationName(event.target.value)} placeholder="e.g. Acme HVAC RTB" />
+              <input data-testid="integration-name-input" className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={integrationName} onChange={event => setIntegrationName(event.target.value)} placeholder="e.g. Acme HVAC RTB" />
             </label>
             <label className="block text-xs font-bold text-slate-500 uppercase">Campaign
-              <select className="mt-1 w-full p-2 border rounded-lg text-sm bg-white normal-case" value={campaignId} onChange={event => setCampaignId(event.target.value)}>
+              <select data-testid="campaign-select" className="mt-1 w-full p-2 border rounded-lg text-sm bg-white normal-case" value={campaignId} onChange={event => setCampaignId(event.target.value)}>
                 <option value="">Select a campaign...</option>
                 {state.campaigns.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
               </select>
@@ -284,7 +284,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             <ShieldCheck size={48} className="mx-auto text-green-600" />
             <h3 className="text-lg font-semibold">Save Draft</h3>
             <p className="text-sm text-slate-500">The draft will be saved as normalized JSON. It will not be activated until a stored test passes.</p>
-            <button onClick={saveDraft} disabled={!canContinue()} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-slate-200">Save Draft</button>
+            <button data-testid="save-draft-button" onClick={saveDraft} disabled={!canContinue()} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-slate-200">Save Draft</button>
           </div>
         );
       case 9:
@@ -309,7 +309,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div data-testid="wizard-page" className="max-w-3xl mx-auto space-y-8">
       {(initialContext?.campaignId || initialContext?.direction) && (
         <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg text-sm text-purple-800">
           Creating {initialContext.direction ? `${initialContext.direction} ` : ""}integration{initialContext.campaignId ? " for this campaign" : ""}.
@@ -332,10 +332,10 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
         {renderStep()}
         {step < 9 && step !== 8 && (
           <div className="mt-8 flex items-center justify-between">
-            <button onClick={() => setStep(current => Math.max(1, current - 1))} disabled={step === 1} className="flex items-center gap-2 text-sm text-slate-500 disabled:opacity-40">
+            <button data-testid="wizard-back-button" onClick={() => setStep(current => Math.max(1, current - 1))} disabled={step === 1} className="flex items-center gap-2 text-sm text-slate-500 disabled:opacity-40">
               <ArrowLeft size={16} /> Back
             </button>
-            <button onClick={goNext} disabled={!canContinue()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">
+            <button data-testid="wizard-continue-button" onClick={goNext} disabled={!canContinue()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">
               Continue <ArrowRight size={16} />
             </button>
           </div>

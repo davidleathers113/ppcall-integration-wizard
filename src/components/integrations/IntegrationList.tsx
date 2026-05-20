@@ -13,7 +13,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({ onSelectIntegration }
   const { state } = useAppContext();
   
   return (
-    <div className="space-y-6">
+    <div data-testid="integrations-page" className="space-y-6">
       <header>
         <h2 className="text-2xl font-bold text-slate-900">Integrations</h2>
         <p className="text-slate-500">Manage all publisher and buyer integrations across all campaigns.</p>
@@ -35,7 +35,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({ onSelectIntegration }
             {state.integrations.map((int) => {
               const currentStatus = calculateFreshnessStatus(int);
               return (
-                <tr key={int.id} className="hover:bg-slate-50 transition-colors group">
+                <tr data-testid="integration-row" key={int.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4">
                     <button 
                       onClick={() => onSelectIntegration(int.id)}

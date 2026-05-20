@@ -104,7 +104,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                   <span className="text-sm text-slate-500">Status</span>
-                  <Badge variant={currentStatus}>{currentStatus}</Badge>
+                  <Badge data-testid="integration-status" variant={currentStatus}>{currentStatus}</Badge>
                 </div>
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                   <span className="text-sm text-slate-500">Usage Count</span>
@@ -215,10 +215,11 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="integration-detail-page" className="space-y-6">
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-        <button 
+        <button
+          data-testid="back-button"
           onClick={onBack}
           className="p-2 hover:bg-slate-200 rounded-full transition-colors"
         >
@@ -234,6 +235,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
         </div>
         <div className="flex items-center gap-2">
           <button
+            data-testid="activate-button"
             onClick={handleActivate}
             disabled={integration.status === "active" || integration.status === "archived"}
             title={latestTestRun?.status === "passed" ? "Activate integration" : "Run and pass a stored test before activation."}
@@ -242,6 +244,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
             <Play size={14} /> Activate
           </button>
           <button
+            data-testid="pause-button"
             onClick={handlePause}
             disabled={integration.status === "paused" || integration.status === "archived"}
             className="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50 flex items-center gap-1"
@@ -249,6 +252,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
             <Pause size={14} /> Pause
           </button>
           <button
+            data-testid="archive-button"
             onClick={handleArchive}
             disabled={integration.status === "archived"}
             className="px-3 py-2 text-xs font-bold bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center gap-1"
@@ -269,11 +273,12 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
           const Icon = tab.icon;
           return (
             <button
+              data-testid={`tab-${tab.id}`}
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-6 py-3 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap ${
-                activeTab === tab.id 
-                  ? "border-purple-600 text-purple-600" 
+                activeTab === tab.id
+                  ? "border-purple-600 text-purple-600"
                   : "border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300"
               }`}
             >

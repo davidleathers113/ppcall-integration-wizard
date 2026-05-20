@@ -17,7 +17,7 @@ const ActivityHistory: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="activity-page" className="space-y-6">
       <header>
         <h2 className="text-2xl font-bold text-slate-900">Activity History</h2>
         <p className="text-slate-500">Audit trail for all integration and campaign modifications.</p>

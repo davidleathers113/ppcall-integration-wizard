@@ -74,26 +74,29 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div data-testid="raw-json-editor" className="space-y-4">
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">Raw JSON Definition</h3>
           <p className="text-xs text-slate-500">Edit the normalized integration object directly. Changes to config may require re-testing.</p>
         </div>
         <div className="flex gap-2">
-          <button 
+          <button
+            data-testid="format-json-button"
             onClick={handleFormat}
             className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1"
           >
             <Code size={14} /> Format JSON
           </button>
-          <button 
+          <button
+            data-testid="reset-json-button"
             onClick={handleReset}
             className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1"
           >
             <RefreshCw size={14} /> Reset
           </button>
-          <button 
+          <button
+            data-testid="save-json-button"
             onClick={handleValidateAndSave}
             className="px-3 py-1.5 text-xs font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 flex items-center gap-1"
           >

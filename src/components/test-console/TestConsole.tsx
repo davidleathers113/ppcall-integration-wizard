@@ -37,7 +37,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="test-console-page" className="space-y-6">
       {!overrideIntegrationId && (
         <header className="flex justify-between items-center">
           <div>
@@ -76,7 +76,8 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
             title={selectedIntegration?.name} 
             subtitle="Configure test parameters and run simulation"
             headerAction={
-              <button 
+              <button
+                data-testid="run-test-button"
                 onClick={handleRunTest}
                 disabled={isRunning}
                 className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all"

@@ -11,7 +11,7 @@ const Dashboard: React.FC = () => {
   const needingAttention = selectIntegrationsNeedingAttention(state);
 
   return (
-    <div className="space-y-6">
+    <div data-testid="dashboard-page" className="space-y-6">
       <header>
         <h2 className="text-2xl font-bold text-slate-900">Platform Overview</h2>
         <p className="text-slate-500">Monitor your integration health and campaign performance.</p>
@@ -19,28 +19,28 @@ const Dashboard: React.FC = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-green-50/50 border-green-100">
+        <Card data-testid="dashboard-stat-active" className="bg-green-50/50 border-green-100">
           <div className="flex flex-col items-center text-center">
             <CheckCircle2 className="text-green-500 mb-2" size={24} />
             <span className="text-2xl font-bold text-slate-900">{stats.active}</span>
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Active</span>
           </div>
         </Card>
-        <Card className="bg-purple-50/50 border-purple-100">
+        <Card data-testid="dashboard-stat-needs-testing" className="bg-purple-50/50 border-purple-100">
           <div className="flex flex-col items-center text-center">
             <Zap className="text-purple-500 mb-2" size={24} />
             <span className="text-2xl font-bold text-slate-900">{stats.needsTesting}</span>
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Need Testing</span>
           </div>
         </Card>
-        <Card className="bg-red-50/50 border-red-100">
+        <Card data-testid="dashboard-stat-failing" className="bg-red-50/50 border-red-100">
           <div className="flex flex-col items-center text-center">
             <AlertCircle className="text-red-500 mb-2" size={24} />
             <span className="text-2xl font-bold text-slate-900">{stats.failing}</span>
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Failing</span>
           </div>
         </Card>
-        <Card className="bg-slate-50/50 border-slate-200">
+        <Card data-testid="dashboard-stat-stale" className="bg-slate-50/50 border-slate-200">
           <div className="flex flex-col items-center text-center">
             <Clock className="text-slate-500 mb-2" size={24} />
             <span className="text-2xl font-bold text-slate-900">{stats.stale}</span>
@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
 
         {/* Sidebar activity */}
         <Card title="Recent Activity" headerAction={<History size={16} className="text-slate-400" />}>
-          <div className="space-y-4">
+          <div data-testid="dashboard-recent-activity" className="space-y-4">
             {state.activityEvents.slice(0, 10).map(event => (
               <div key={event.id} className="flex gap-3">
                 <div className="mt-1">

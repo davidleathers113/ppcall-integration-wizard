@@ -110,7 +110,7 @@ const BulkImport: React.FC = () => {
   const autoMapColumns = () => setMappings(parseResult.headers.map(autoMapColumn));
 
   return (
-    <div className="space-y-6">
+    <div data-testid="bulk-import-page" className="space-y-6">
       <header className="flex justify-between items-start gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Bulk Import</h2>
@@ -155,7 +155,7 @@ const BulkImport: React.FC = () => {
           {fileMeta && <p className="text-xs text-slate-500 mb-3"><FileText size={14} className="inline mr-1" />{fileMeta.name} • {(fileMeta.size / 1024).toFixed(1)} KB</p>}
           <textarea className="w-full h-72 p-4 font-mono text-sm bg-slate-50 border rounded-xl" value={rawContent} onChange={event => setRawContent(event.target.value)} placeholder={mode === "csv" ? IMPORT_TEMPLATES.buyer_rtb.content : IMPORT_TEMPLATES.json.content} />
           <div className="mt-4 flex justify-end">
-            <button onClick={() => parseContent()} disabled={!rawContent.trim()} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Parse Content</button>
+            <button data-testid="parse-button" onClick={() => parseContent()} disabled={!rawContent.trim()} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Parse Content</button>
           </div>
         </Card>
       )}
@@ -182,7 +182,7 @@ const BulkImport: React.FC = () => {
             ))}
           </div>
           <div className="mt-4 flex justify-end">
-            <button onClick={() => validateParsedRows()} disabled={parseResult.errors.length > 0 || columnIssues.length > 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Validate Rows</button>
+            <button data-testid="validate-button" onClick={() => validateParsedRows()} disabled={parseResult.errors.length > 0 || columnIssues.length > 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Validate Rows</button>
           </div>
         </Card>
       )}
@@ -207,9 +207,9 @@ const BulkImport: React.FC = () => {
           <div className="mt-4 flex justify-between">
             <button onClick={() => setStep("mapping")} className="px-3 py-2 bg-slate-100 rounded-lg text-sm font-bold">Back to Mapping</button>
             {step === "validation" ? (
-              <button onClick={() => setStep("preview")} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Preview Import</button>
+              <button data-testid="preview-button" onClick={() => setStep("preview")} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Preview Import</button>
             ) : (
-              <button onClick={handleImport} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Import {eligibleRows.length} Rows</button>
+              <button data-testid="import-button" onClick={handleImport} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Import {eligibleRows.length} Rows</button>
             )}
           </div>
         </Card>

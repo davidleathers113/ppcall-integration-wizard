@@ -70,7 +70,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div data-testid="ai-assistant-page" className="space-y-6">
       <header>
         <h2 className="text-2xl font-bold text-slate-900">AI Integration Assistant</h2>
         <p className="text-slate-500">Paste buyer or publisher instructions and generate a draft normalized configuration.</p>

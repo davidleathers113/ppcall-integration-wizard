@@ -103,7 +103,7 @@ const DeveloperDocs: React.FC = () => {
   const exampleText = JSON.stringify(examples[activeExample], null, 2);
 
   return (
-    <div className="space-y-6">
+    <div data-testid="developer-docs-page" className="space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Developer API</h2>
