@@ -39,6 +39,7 @@ export interface IntegrationConfig {
   destinationNumber?: string;
   sipAddress?: string;
   postingUrl?: string;
+  publisherId?: string;
   requiredFields?: string[];
   acceptedResponse?: Record<string, unknown>;
   rejectedResponse?: Record<string, unknown>;

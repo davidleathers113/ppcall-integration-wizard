@@ -127,6 +127,7 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     status: "active",
     config: {
       postingUrl: "https://mock-ppcall.local/rtb/camp_hvac/pub_abc",
+      publisherId: "pub_abc",
       requiredFields: ["caller_id", "zip"],
       expiresInSeconds: 30
     },
@@ -149,7 +150,10 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     type: "rtb",
     platformPreset: "ringba_rtb",
     status: "active",
-    config: PRESETS.ringba_rtb.config,
+    config: {
+      ...PRESETS.ringba_rtb.config,
+      url: "https://premier-home-services.example/ping"
+    },
     createdAt: "2026-01-11T11:00:00Z",
     createdBy: "Sarah",
     updatedAt: "2026-01-11T11:00:00Z",
@@ -170,7 +174,9 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     platformPreset: "static_number",
     status: "stale",
     config: {
-      destinationNumber: "+18885550101"
+      destinationNumber: "+18885550101",
+      publisherId: "pub_leadflow",
+      requiredFields: ["caller_id"]
     },
     createdAt: "2026-02-16T10:00:00Z",
     createdBy: "Mike",
@@ -214,7 +220,9 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     status: "needs_testing",
     config: {
       postingUrl: "https://mock-ppcall.local/rtb/camp_ssdi/pub_search",
-      requiredFields: ["caller_id", "state"]
+      publisherId: "pub_search",
+      requiredFields: ["caller_id", "state"],
+      expiresInSeconds: 30
     },
     createdAt: "2026-03-21T09:00:00Z",
     createdBy: "Sarah",

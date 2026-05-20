@@ -57,9 +57,46 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
         status: config.destinationNumber ? "pass" : "fail",
         message: config.destinationNumber ? "Static number configured." : "Destination number is missing."
       });
+      checklist.push({
+        label: "Conversion duration present",
+        status: config.conversionDurationSeconds ? "pass" : "fail",
+        message: config.conversionDurationSeconds ? "Conversion duration configured." : "Conversion duration is missing."
+      });
+      checklist.push({
+        label: "Payout present",
+        status: config.payout !== undefined ? "pass" : "fail",
+        message: config.payout !== undefined ? "Payout configured." : "Payout is missing."
+      });
+    } else if (integration.type === "sip") {
+      checklist.push({
+        label: "SIP address present",
+        status: config.sipAddress ? "pass" : "fail",
+        message: config.sipAddress ? "SIP address configured." : "SIP address is missing."
+      });
+      checklist.push({
+        label: "Conversion duration present",
+        status: config.conversionDurationSeconds ? "pass" : "fail",
+        message: config.conversionDurationSeconds ? "Conversion duration configured." : "Conversion duration is missing."
+      });
+      checklist.push({
+        label: "Payout present",
+        status: config.payout !== undefined ? "pass" : "fail",
+        message: config.payout !== undefined ? "Payout configured." : "Payout is missing."
+      });
     }
   } else {
     // Publisher checks
+    checklist.push({
+      label: "Publisher ID present",
+      status: config.publisherId ? "pass" : "fail",
+      message: config.publisherId ? "Publisher ID configured." : "Publisher ID is missing."
+    });
+    const hasIngress = Boolean(config.postingUrl || config.destinationNumber || config.sipAddress);
+    checklist.push({
+      label: "Publisher ingress configured",
+      status: hasIngress ? "pass" : "fail",
+      message: hasIngress ? "Posting URL, number, or SIP endpoint configured." : "Publisher posting URL, number, or SIP address is missing."
+    });
     checklist.push({
       label: "Campaign ID mapped",
       status: integration.campaignId ? "pass" : "fail",
@@ -78,6 +115,13 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
         message: config.requiredFields!.includes("caller_id") ? "Caller ID mapped." : "Publisher must pass caller_id."
       });
     }
+    if (integration.type === "rtb") {
+      checklist.push({
+        label: "RTB expiration configured",
+        status: config.expiresInSeconds ? "pass" : "fail",
+        message: config.expiresInSeconds ? "Expiration window configured." : "RTB publisher expiration is missing."
+      });
+    }
   }
 
   // 2. Token mapping checks
@@ -85,10 +129,16 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
     const bodyStr = JSON.stringify(config.requestBody || {});
     const queryStr = JSON.stringify(config.queryParams || {});
     const hasCallerId = bodyStr.includes("caller_id") || queryStr.includes("caller_id");
+    const hasZip = bodyStr.includes("zip") || queryStr.includes("zip");
     checklist.push({
       label: "Caller ID mapped",
       status: hasCallerId ? "pass" : "fail",
       message: hasCallerId ? "Caller ID token found in request." : "Caller ID must be mapped to an internal token."
+    });
+    checklist.push({
+      label: "ZIP mapped",
+      status: hasZip ? "pass" : "fail",
+      message: hasZip ? "ZIP token found in request." : "ZIP token is required for this mock RTB/API test."
     });
   }
 

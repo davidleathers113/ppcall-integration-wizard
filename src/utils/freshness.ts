@@ -1,9 +1,17 @@
 import type { Integration, IntegrationStatus } from "../models/appTypes";
 
-export function getDaysSince(dateString?: string): number {
+export interface FreshnessDetails {
+  daysSinceLastUse: number | null;
+  daysSinceLastSuccessfulTest: number | null;
+  editedAfterLastSuccessfulTest: boolean;
+  status: IntegrationStatus;
+  reason: string;
+  recommendedAction: string;
+}
+
+export function getDaysSince(dateString?: string, now: Date = new Date()): number {
   if (!dateString) return 999;
   const lastDate = new Date(dateString);
-  const now = new Date();
   
   if (lastDate > now) return 0;
   
@@ -11,44 +19,112 @@ export function getDaysSince(dateString?: string): number {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
-export function calculateFreshnessStatus(integration: Integration): IntegrationStatus {
+export function calculateFreshnessStatus(integration: Integration, now: Date = new Date()): IntegrationStatus {
+  return getFreshnessDetails(integration, now).status;
+}
+
+export function getFreshnessDetails(integration: Integration, now: Date = new Date()): FreshnessDetails {
+  const daysSinceLastUse = integration.lastUsedAt ? getDaysSince(integration.lastUsedAt, now) : null;
+  const daysSinceLastSuccessfulTest = integration.lastSuccessfulTestAt ? getDaysSince(integration.lastSuccessfulTestAt, now) : null;
+  const editedAfterLastSuccessfulTest = Boolean(
+    integration.lastSuccessfulTestAt &&
+    new Date(integration.updatedAt) > new Date(integration.lastSuccessfulTestAt)
+  );
+
   if (integration.status === "paused" || integration.status === "archived" || integration.status === "draft") {
-    return integration.status;
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: integration.status,
+      reason: `Integration is ${integration.status}.`,
+      recommendedAction: integration.status === "draft" ? "Complete configuration and run a test." : "No action required unless this status should change."
+    };
   }
 
   if (!integration.lastTestedAt) {
-    return "needs_testing";
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "needs_testing",
+      reason: "No test has been run.",
+      recommendedAction: "Run the integration test console."
+    };
   }
 
-  if (
-    integration.lastSuccessfulTestAt &&
-    new Date(integration.updatedAt) > new Date(integration.lastSuccessfulTestAt)
-  ) {
-    return "needs_retest";
+  if (editedAfterLastSuccessfulTest) {
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "needs_retest",
+      reason: "Configuration was edited after the last successful test.",
+      recommendedAction: "Run a new test before activation or routing traffic."
+    };
   }
 
   if (integration.errorRate > 0.2) {
-    return "failing";
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "failing",
+      reason: "Error rate is above 20%.",
+      recommendedAction: "Inspect recent failures and retest the integration."
+    };
   }
 
   if (integration.status === "active" && integration.usageCount === 0) {
-    return "active_unused";
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "active_unused",
+      reason: "Integration is active but has no usage.",
+      recommendedAction: "Confirm routing rules and publisher traffic."
+    };
   }
 
-  const daysSinceLastUse = getDaysSince(integration.lastUsedAt);
-
-  if (integration.status === "active" && daysSinceLastUse >= 30) {
-    return "stale";
+  if (integration.status === "active" && daysSinceLastUse !== null && daysSinceLastUse >= 30) {
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "stale",
+      reason: "No recorded usage in 30+ days.",
+      recommendedAction: "Review whether this integration should be archived or revalidated."
+    };
   }
 
-  if (integration.status === "active" && daysSinceLastUse >= 7) {
-    return "dormant";
+  if (integration.status === "active" && daysSinceLastUse !== null && daysSinceLastUse >= 7) {
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "dormant",
+      reason: "No recorded usage in 7+ days.",
+      recommendedAction: "Check campaign traffic and routing priority."
+    };
   }
 
-  // If it's active and none of the above applied, it's just active.
   if (integration.status === "active") {
-    return "active";
+    return {
+      daysSinceLastUse,
+      daysSinceLastSuccessfulTest,
+      editedAfterLastSuccessfulTest,
+      status: "active",
+      reason: "Integration is active and fresh.",
+      recommendedAction: "No action required."
+    };
   }
 
-  return "test_passed";
+  return {
+    daysSinceLastUse,
+    daysSinceLastSuccessfulTest,
+    editedAfterLastSuccessfulTest,
+    status: "test_passed",
+    reason: "Latest freshness checks are satisfied but integration is not active.",
+    recommendedAction: "Activate when ready."
+  };
 }
