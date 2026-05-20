@@ -47,7 +47,7 @@ async function startDirectTargetWizard(
 }
 
 async function walkContinueUntilSave(page: Page) {
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     const saveButton = page.getByTestId('wizard-save-draft-button');
     if (await saveButton.isVisible().catch(() => false)) return;
     const continueButton = page.getByTestId('wizard-continue-button');
@@ -58,9 +58,89 @@ async function walkContinueUntilSave(page: Page) {
   throw new Error('Did not reach the Save Draft step');
 }
 
+/**
+ * After the destination step is filled, advance to Call Handling and fill the
+ * payout + conversion duration inputs that block the Continue button.
+ */
+async function fillCallHandlingStep(
+  page: Page,
+  payout: number,
+  conversionDuration: number
+) {
+  await expect(page.getByTestId('wizard-step-call-handling')).toBeVisible();
+  const numberInputs = page.getByTestId('wizard-step-call-handling').locator('input[type="number"]');
+  await numberInputs.nth(0).fill(String(payout));
+  await numberInputs.nth(1).fill(String(conversionDuration));
+}
+
 test.describe('Direct Target Mode', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+  });
+
+  test('Destination step surfaces phone-number validation and blocks Continue', async ({
+    page,
+  }) => {
+    const campaignName = await getFirstCampaignName(page);
+    await startDirectTargetWizard(page, campaignName, 'Validation Surface', 'direct-number');
+
+    await expect(page.getByTestId('wizard-step-destination')).toBeVisible();
+    const continueButton = page.getByTestId('wizard-continue-button');
+    const status = page.getByTestId('wizard-direct-number-status');
+
+    // Empty → status "empty", Continue disabled.
+    await expect(status).toHaveAttribute('data-status', 'empty');
+    await expect(continueButton).toBeDisabled();
+
+    // Garbage input → status "invalid", Continue still disabled.
+    await page.getByTestId('wizard-direct-number-input').fill('abc');
+    await expect(status).toHaveAttribute('data-status', 'invalid');
+    await expect(continueButton).toBeDisabled();
+
+    // Valid E.164 → status "valid", Continue enabled.
+    await page.getByTestId('wizard-direct-number-input').fill('+18005551212');
+    await expect(status).toHaveAttribute('data-status', 'valid');
+    await expect(continueButton).toBeEnabled();
+  });
+
+  test('Destination step surfaces SIP validation and blocks Continue', async ({ page }) => {
+    const campaignName = await getFirstCampaignName(page);
+    await startDirectTargetWizard(page, campaignName, 'SIP Validation', 'direct-sip');
+
+    await expect(page.getByTestId('wizard-step-destination')).toBeVisible();
+    const status = page.getByTestId('wizard-direct-sip-status');
+    const continueButton = page.getByTestId('wizard-continue-button');
+
+    await expect(status).toHaveAttribute('data-status', 'empty');
+    await expect(continueButton).toBeDisabled();
+
+    await page.getByTestId('wizard-direct-sip-input').fill('not-a-sip');
+    await expect(status).toHaveAttribute('data-status', 'invalid');
+    await expect(continueButton).toBeDisabled();
+
+    await page.getByTestId('wizard-direct-sip-input').fill('sip:buyer@example.com');
+    await expect(status).toHaveAttribute('data-status', 'valid');
+    await expect(continueButton).toBeEnabled();
+  });
+
+  test('Direct Number wizard shows Destination → Call Handling → Schedule & Caps sub-steps', async ({
+    page,
+  }) => {
+    const campaignName = await getFirstCampaignName(page);
+    await startDirectTargetWizard(page, campaignName, 'Sub-step Check', 'direct-number');
+
+    // Destination step
+    await expect(page.getByTestId('wizard-step-destination')).toBeVisible();
+    await page.getByTestId('wizard-direct-number-input').fill('+18005551212');
+    await page.getByTestId('wizard-continue-button').click();
+
+    // Call Handling step
+    await expect(page.getByTestId('wizard-step-call-handling')).toBeVisible();
+    await fillCallHandlingStep(page, 35, 120);
+    await page.getByTestId('wizard-continue-button').click();
+
+    // Schedule & Caps step
+    await expect(page.getByTestId('wizard-step-schedule-caps')).toBeVisible();
   });
 
   test('creates a Direct Number Target through the wizard', async ({ page }) => {
@@ -71,18 +151,16 @@ test.describe('Direct Target Mode', () => {
     const integrationName = 'E2E Direct Number';
     await startDirectTargetWizard(page, campaignName, integrationName, 'direct-number');
 
-    // Step 5: destination + payout + conversion
+    // Destination step
     await page.getByTestId('wizard-direct-number-input').fill('+18005551212');
-    // Payout (NumberField - find by label fallback). Use placeholder by label is harder; instead select by tag.
-    const numberInputs = page.locator('input[type="number"]');
-    await numberInputs.nth(0).fill('35');
-    await numberInputs.nth(1).fill('120');
-
-    // Confirm step 6 ("Response Parsing") shows the "no parsing required" panel
-    // by walking continue once and looking for the marker, then continuing again
-    // until Save Draft appears.
     await page.getByTestId('wizard-continue-button').click();
-    await expect(page.getByTestId('wizard-no-parsing-required')).toBeVisible();
+
+    // Call Handling step
+    await fillCallHandlingStep(page, 35, 120);
+    await page.getByTestId('wizard-continue-button').click();
+
+    // Schedule & Caps step exists for direct targets — walk to save.
+    await expect(page.getByTestId('wizard-step-schedule-caps')).toBeVisible();
 
     await walkContinueUntilSave(page);
     await page.getByTestId('wizard-save-draft-button').click();
@@ -106,9 +184,8 @@ test.describe('Direct Target Mode', () => {
     const integrationName = 'E2E Direct Number Config';
     await startDirectTargetWizard(page, campaignName, integrationName, 'direct-number');
     await page.getByTestId('wizard-direct-number-input').fill('+18005551212');
-    const numberInputs = page.locator('input[type="number"]');
-    await numberInputs.nth(0).fill('35');
-    await numberInputs.nth(1).fill('120');
+    await page.getByTestId('wizard-continue-button').click();
+    await fillCallHandlingStep(page, 35, 120);
     await walkContinueUntilSave(page);
     await page.getByTestId('wizard-save-draft-button').click();
     await expect(page.getByTestId('wizard-saved-step')).toBeVisible();
@@ -155,9 +232,8 @@ test.describe('Direct Target Mode', () => {
     const integrationName = 'E2E Direct Number Test';
     await startDirectTargetWizard(page, campaignName, integrationName, 'direct-number');
     await page.getByTestId('wizard-direct-number-input').fill('+18005551212');
-    const numberInputs = page.locator('input[type="number"]');
-    await numberInputs.nth(0).fill('35');
-    await numberInputs.nth(1).fill('120');
+    await page.getByTestId('wizard-continue-button').click();
+    await fillCallHandlingStep(page, 35, 120);
     await walkContinueUntilSave(page);
     await page.getByTestId('wizard-save-draft-button').click();
     await page.getByTestId('wizard-open-detail-button').click();
@@ -183,13 +259,9 @@ test.describe('Direct Target Mode', () => {
     await startDirectTargetWizard(page, campaignName, integrationName, 'direct-sip');
 
     await page.getByTestId('wizard-direct-sip-input').fill('sip:buyer@example.com');
-    const numberInputs = page.locator('input[type="number"]');
-    await numberInputs.nth(0).fill('35');
-    await numberInputs.nth(1).fill('120');
-
     await page.getByTestId('wizard-continue-button').click();
-    await expect(page.getByTestId('wizard-no-parsing-required')).toBeVisible();
 
+    await fillCallHandlingStep(page, 35, 120);
     await walkContinueUntilSave(page);
     await page.getByTestId('wizard-save-draft-button').click();
     await expect(page.getByTestId('wizard-saved-step')).toBeVisible();

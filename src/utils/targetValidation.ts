@@ -4,6 +4,7 @@ import type {
   IntegrationConfig,
   IntegrationSchedule,
 } from "../models/appTypes";
+import { normalizeSchedule } from "./buyerConfigDefaults";
 
 export interface ValidationResult {
   valid: boolean;
@@ -251,8 +252,9 @@ export function validateSchedule(schedule: IntegrationSchedule | undefined): Val
     }
   }
   if (schedule.mode === "advanced") {
-    const dayRules = schedule.dayRules || [];
-    const anyEnabled = dayRules.some(rule => rule.enabled);
+    // Operate on the canonical form so dayRules-or-legacy don't matter.
+    const normalized = normalizeSchedule(schedule);
+    const anyEnabled = normalized.dayRules.some(rule => rule.enabled);
     if (!anyEnabled) {
       issues.push({
         field: "schedule.dayRules",
@@ -260,7 +262,7 @@ export function validateSchedule(schedule: IntegrationSchedule | undefined): Val
         message: "Advanced schedule requires at least one enabled day.",
       });
     }
-    for (const rule of dayRules) {
+    for (const rule of normalized.dayRules) {
       if (rule.enabled && (!rule.startTime || !rule.endTime)) {
         issues.push({
           field: `schedule.dayRules.${rule.day}`,

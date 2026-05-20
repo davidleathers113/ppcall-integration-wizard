@@ -12,6 +12,7 @@ import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
 import { useToast } from "../shared/ToastProvider";
 import { createId } from "../../utils/id";
+import { validatePhoneNumber, validateSipAddress } from "../../utils/targetValidation";
 
 interface AddIntegrationWizardProps {
   onComplete?: (id: string) => void;
@@ -21,15 +22,65 @@ interface AddIntegrationWizardProps {
   };
 }
 
-const steps = ["Direction", "Type", "Basics", "Preset", "Configure", "Parsing", "Review", "Save", "Test"];
+type WizardStepId =
+  | "direction"
+  | "type"
+  | "basics"
+  | "preset"
+  | "destination"
+  | "call-handling"
+  | "schedule-caps"
+  | "configure"
+  | "parsing"
+  | "review"
+  | "save"
+  | "saved";
+
+interface WizardStepContext {
+  direction: IntegrationDirection | null;
+  type: IntegrationType | null;
+  buyerKind: BuyerDestinationKind | null;
+}
+
+interface WizardStepDef {
+  id: WizardStepId;
+  label: string;
+  applies: (ctx: WizardStepContext) => boolean;
+}
+
+const isDirectKind = (kind: BuyerDestinationKind | null) =>
+  kind === "direct_number" || kind === "direct_sip";
+
+const MASTER_STEPS: WizardStepDef[] = [
+  { id: "direction", label: "Direction", applies: () => true },
+  { id: "type", label: "Type", applies: () => true },
+  { id: "basics", label: "Basics", applies: () => true },
+  { id: "preset", label: "Preset", applies: () => true },
+  // Direct-target path (direct number / direct sip):
+  { id: "destination", label: "Destination", applies: ctx => isDirectKind(ctx.buyerKind) },
+  { id: "call-handling", label: "Call Handling", applies: ctx => isDirectKind(ctx.buyerKind) },
+  { id: "schedule-caps", label: "Schedule & Caps", applies: ctx => isDirectKind(ctx.buyerKind) },
+  // RTB / webhook / generic_api / publisher path:
+  { id: "configure", label: "Configure", applies: ctx => !isDirectKind(ctx.buyerKind) },
+  {
+    id: "parsing",
+    label: "Parsing",
+    applies: ctx =>
+      !isDirectKind(ctx.buyerKind) &&
+      ctx.direction === "buyer" &&
+      (ctx.type === "rtb" || ctx.type === "webhook" || ctx.type === "generic_api"),
+  },
+  { id: "review", label: "Review", applies: () => true },
+  { id: "save", label: "Save", applies: () => true },
+  { id: "saved", label: "Saved", applies: () => true },
+];
 
 const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete, initialContext }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
   const toast = useToast();
-  const hasInitialCampaign = Boolean(initialContext?.campaignId);
   const hasInitialDirection = Boolean(initialContext?.direction);
-  const [step, setStep] = useState(hasInitialCampaign && hasInitialDirection ? 2 : hasInitialDirection ? 2 : 1);
+  const [stepId, setStepId] = useState<WizardStepId>(hasInitialDirection ? "type" : "direction");
   const [direction, setDirection] = useState<IntegrationDirection | null>(initialContext?.direction || null);
   const [type, setType] = useState<IntegrationType | null>(null);
   const [buyerKind, setBuyerKind] = useState<BuyerDestinationKind | null>(null);
@@ -50,6 +101,29 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
       rejectReasonPath: "$.reason"
     }
   });
+
+  const stepContext: WizardStepContext = useMemo(
+    () => ({ direction, type, buyerKind }),
+    [direction, type, buyerKind]
+  );
+  const activeSteps = useMemo(
+    () => MASTER_STEPS.filter(step => step.applies(stepContext)),
+    [stepContext]
+  );
+  const activeStepIds = useMemo(() => activeSteps.map(step => step.id), [activeSteps]);
+  // If direction/type/buyerKind changes invalidate the persisted stepId, derive
+  // a safe fallback at render time instead of syncing state in an effect.
+  // The next navigation click will set stepId properly.
+  const safeStepId: WizardStepId = activeStepIds.includes(stepId)
+    ? stepId
+    : activeStepIds[Math.max(0, activeStepIds.length - 1)] || "direction";
+  const currentIndex = activeStepIds.indexOf(safeStepId);
+  // Visible (non-terminal) steps for the breadcrumb. "saved" is terminal — hide
+  // it until reached so the breadcrumb count matches the linear flow.
+  const visibleSteps = useMemo(
+    () => activeSteps.filter(step => step.id !== "saved"),
+    [activeSteps]
+  );
 
   const normalizedConfig = useMemo((): IntegrationConfig => {
     if (direction === "publisher") {
@@ -76,7 +150,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
         payout: config.payout,
         conversionDurationSeconds: config.conversionDurationSeconds,
         caps: config.caps,
-        schedule: config.schedule,
+        schedule: config.schedule ?? defaultDirectTargetSchedule(),
       };
     }
     if (buyerKind === "direct_sip") {
@@ -92,7 +166,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
         payout: config.payout,
         conversionDurationSeconds: config.conversionDurationSeconds,
         caps: config.caps,
-        schedule: config.schedule,
+        schedule: config.schedule ?? defaultDirectTargetSchedule(),
       };
     }
     if (type === "static_number") {
@@ -116,34 +190,71 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
     return config as IntegrationConfig;
   }, [buyerKind, campaignId, config, direction, integrationName, type]);
 
-  const isDirectTarget = direction === "buyer" && (buyerKind === "direct_number" || buyerKind === "direct_sip");
+  const isDirectTarget = direction === "buyer" && isDirectKind(buyerKind);
 
   const canContinue = () => {
-    if (step === 1) return Boolean(direction);
-    if (step === 2) return Boolean(type);
-    if (step === 3) return Boolean(campaignId && integrationName.trim());
-    if (step === 5) {
-      if (direction === "publisher") return Boolean(normalizedConfig.publisherId && (normalizedConfig.postingUrl || normalizedConfig.destinationNumber || normalizedConfig.sipAddress));
-      if (buyerKind === "direct_number")
+    switch (safeStepId) {
+      case "direction":
+        return Boolean(direction);
+      case "type":
+        return Boolean(type);
+      case "basics":
+        return Boolean(campaignId && integrationName.trim());
+      case "preset":
+        return true;
+      case "destination": {
+        if (buyerKind === "direct_number") {
+          const number = normalizedConfig.destination?.number || normalizedConfig.destinationNumber || "";
+          return validatePhoneNumber(number).valid;
+        }
+        if (buyerKind === "direct_sip") {
+          const sipAddress = normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress || "";
+          return validateSipAddress(sipAddress).valid;
+        }
+        return true;
+      }
+      case "call-handling": {
+        // Payout + conversion duration are mandatory for direct targets.
+        return Boolean(normalizedConfig.payout && normalizedConfig.conversionDurationSeconds);
+      }
+      case "schedule-caps": {
+        // Timezone is required; everything else has sensible defaults.
+        return Boolean(normalizedConfig.schedule?.timezone);
+      }
+      case "configure": {
+        if (direction === "publisher") {
+          return Boolean(
+            normalizedConfig.publisherId &&
+              (normalizedConfig.postingUrl ||
+                normalizedConfig.destinationNumber ||
+                normalizedConfig.sipAddress)
+          );
+        }
+        if (type === "static_number") {
+          return Boolean(
+            normalizedConfig.destinationNumber &&
+              normalizedConfig.payout &&
+              normalizedConfig.conversionDurationSeconds
+          );
+        }
+        if (type === "sip") {
+          return Boolean(
+            normalizedConfig.sipAddress &&
+              normalizedConfig.payout &&
+              normalizedConfig.conversionDurationSeconds
+          );
+        }
+        return Boolean(normalizedConfig.url && normalizedConfig.method);
+      }
+      case "parsing":
         return Boolean(
-          (normalizedConfig.destination?.number || normalizedConfig.destinationNumber) &&
-            normalizedConfig.payout &&
-            normalizedConfig.conversionDurationSeconds
+          normalizedConfig.responseParsing?.acceptedPath &&
+            (normalizedConfig.responseParsing.destinationNumberPath ||
+              normalizedConfig.responseParsing.sipAddressPath)
         );
-      if (buyerKind === "direct_sip")
-        return Boolean(
-          (normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress) &&
-            normalizedConfig.payout &&
-            normalizedConfig.conversionDurationSeconds
-        );
-      if (type === "static_number") return Boolean(normalizedConfig.destinationNumber && normalizedConfig.payout && normalizedConfig.conversionDurationSeconds);
-      if (type === "sip") return Boolean(normalizedConfig.sipAddress && normalizedConfig.payout && normalizedConfig.conversionDurationSeconds);
-      return Boolean(normalizedConfig.url && normalizedConfig.method);
+      default:
+        return true;
     }
-    if (step === 6 && direction === "buyer" && !isDirectTarget && ["rtb", "generic_api", "webhook"].includes(type || "")) {
-      return Boolean(normalizedConfig.responseParsing?.acceptedPath && (normalizedConfig.responseParsing.destinationNumberPath || normalizedConfig.responseParsing.sipAddressPath));
-    }
-    return true;
   };
 
   const saveDraft = () => {
@@ -164,7 +275,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
       : "Draft created. Run a test before activation.";
     setMessage(successMessage);
     toast.success(`Draft integration "${integration.name}" created.`);
-    setStep(9);
+    setStepId("saved");
   };
 
   const updateConfig = <Key extends keyof IntegrationConfig>(key: Key, value: IntegrationConfig[Key]) => {
@@ -185,12 +296,15 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
   const selectPreset = (key: string) => {
     setSelectedPreset(key);
     if (PRESETS[key]) setConfig(current => ({ ...current, ...PRESETS[key].config }));
-    setStep(5);
+    // Advance to the first step that follows "preset" in the active list.
+    const presetIdx = MASTER_STEPS.findIndex(step => step.id === "preset");
+    const next = MASTER_STEPS.slice(presetIdx + 1).find(step => step.applies(stepContext));
+    if (next) setStepId(next.id);
   };
 
   const renderStep = () => {
-    switch (step) {
-      case 1:
+    switch (safeStepId) {
+      case "direction":
         return (
           <div className="space-y-6">
             <h3 className="text-lg font-semibold text-center">Choose Integration Direction</h3>
@@ -211,7 +325,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             </div>
           </div>
         );
-      case 2: {
+      case "type": {
         type TypeOption = {
           id: IntegrationType;
           buyerKind?: BuyerDestinationKind;
@@ -259,7 +373,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
           </div>
         );
       }
-      case 3:
+      case "basics":
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Campaign + Integration Name</h3>
@@ -274,7 +388,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             </label>
           </div>
         );
-      case 4: {
+      case "preset": {
         const presets = Object.entries(PRESETS).filter(([key]) => {
           if (buyerKind === "direct_number") return key === "direct_number" || key === "static_number";
           if (buyerKind === "direct_sip") return key === "direct_sip" || key === "sip_endpoint";
@@ -299,7 +413,56 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
           </div>
         );
       }
-      case 5:
+      case "destination":
+        return (
+          <div data-testid="wizard-step-destination" className="space-y-4">
+            <h3 className="text-lg font-semibold text-center">Destination</h3>
+            {buyerKind === "direct_number" ? (
+              <>
+                <Field testId="wizard-direct-number-input" label="Destination Number" value={normalizedConfig.destination?.number || normalizedConfig.destinationNumber || ""} onChange={value => {
+                  setConfig(current => ({
+                    ...current,
+                    destinationNumber: value,
+                    destination: { ...(current.destination || {}), number: value },
+                  }));
+                }} />
+                <WizardNumberStatus value={normalizedConfig.destination?.number || normalizedConfig.destinationNumber || ""} />
+                <p className="text-[11px] text-slate-500 italic">Use country code format, such as +12223334444.</p>
+              </>
+            ) : (
+              <>
+                <Field testId="wizard-direct-sip-input" label="SIP Address" value={normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress || ""} onChange={value => {
+                  setConfig(current => ({
+                    ...current,
+                    sipAddress: value,
+                    destination: { ...(current.destination || {}), sipAddress: value },
+                  }));
+                }} />
+                <WizardSipStatus value={normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress || ""} />
+                <p className="text-[11px] text-slate-500 italic">Use a SIP URI such as sip:buyer@example.com.</p>
+                <DirectSipHeadersField config={normalizedConfig} setConfig={setConfig} />
+              </>
+            )}
+          </div>
+        );
+      case "call-handling":
+        return (
+          <div data-testid="wizard-step-call-handling" className="space-y-4">
+            <h3 className="text-lg font-semibold text-center">Call Handling &amp; Revenue</h3>
+            <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
+            <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
+            <DirectCallHandlingFields config={normalizedConfig} setConfig={setConfig} />
+          </div>
+        );
+      case "schedule-caps":
+        return (
+          <div data-testid="wizard-step-schedule-caps" className="space-y-4">
+            <h3 className="text-lg font-semibold text-center">Schedule, Caps &amp; Duplicate Rules</h3>
+            <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
+            <DirectDuplicateRulesField config={normalizedConfig} setConfig={setConfig} />
+          </div>
+        );
+      case "configure":
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Configure Request / Destination</h3>
@@ -309,39 +472,6 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
                 <Field label="Posting URL" value={normalizedConfig.postingUrl || ""} onChange={value => updateConfig("postingUrl", value)} />
                 {type === "rtb" && <NumberField label="Expiration Seconds" value={normalizedConfig.expiresInSeconds || 30} onChange={value => updateConfig("expiresInSeconds", value)} />}
                 <RequiredFields selected={normalizedConfig.requiredFields || []} onToggle={toggleRequiredField} />
-              </>
-            ) : buyerKind === "direct_number" ? (
-              <>
-                <Field testId="wizard-direct-number-input" label="Destination Number" value={normalizedConfig.destination?.number || normalizedConfig.destinationNumber || ""} onChange={value => {
-                  setConfig(current => ({
-                    ...current,
-                    destinationNumber: value,
-                    destination: { ...(current.destination || {}), number: value },
-                  }));
-                }} />
-                <p className="text-[11px] text-slate-500 italic">Use country code format, such as +12223334444.</p>
-                <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
-                <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
-                <DirectCallHandlingFields config={normalizedConfig} setConfig={setConfig} />
-                <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
-                <DirectDuplicateRulesField config={normalizedConfig} setConfig={setConfig} />
-              </>
-            ) : buyerKind === "direct_sip" ? (
-              <>
-                <Field testId="wizard-direct-sip-input" label="SIP Address" value={normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress || ""} onChange={value => {
-                  setConfig(current => ({
-                    ...current,
-                    sipAddress: value,
-                    destination: { ...(current.destination || {}), sipAddress: value },
-                  }));
-                }} />
-                <p className="text-[11px] text-slate-500 italic">Use a SIP URI such as sip:buyer@example.com.</p>
-                <DirectSipHeadersField config={normalizedConfig} setConfig={setConfig} />
-                <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
-                <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
-                <DirectCallHandlingFields config={normalizedConfig} setConfig={setConfig} />
-                <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
-                <DirectDuplicateRulesField config={normalizedConfig} setConfig={setConfig} />
               </>
             ) : type === "static_number" ? (
               <>
@@ -371,15 +501,13 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             )}
           </div>
         );
-      case 6:
+      case "parsing":
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Response Parsing</h3>
-            {direction === "publisher" || isDirectTarget || type === "static_number" || type === "sip" ? (
+            {direction === "publisher" || type === "static_number" || type === "sip" ? (
               <div data-testid="wizard-no-parsing-required" className="p-4 bg-slate-50 border rounded-lg text-sm text-slate-600">
-                {isDirectTarget
-                  ? "Direct targets route calls to a number or SIP destination. No buyer response JSON parsing is required."
-                  : "This integration type does not require buyer response JSON parsing."}
+                This integration type does not require buyer response JSON parsing.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -393,14 +521,14 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             )}
           </div>
         );
-      case 7:
+      case "review":
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Review JSON</h3>
             <pre className="p-4 bg-slate-900 text-blue-300 rounded-xl text-xs overflow-auto max-h-96">{JSON.stringify({ campaignId, name: integrationName, direction, type, platformPreset: selectedPreset, status: "draft", config: normalizedConfig }, null, 2)}</pre>
           </div>
         );
-      case 8:
+      case "save":
         return (
           <div className="space-y-4 text-center">
             <ShieldCheck size={48} className="mx-auto text-green-600" />
@@ -409,7 +537,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             <button data-testid="wizard-save-draft-button" onClick={saveDraft} disabled={!canContinue()} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-slate-200">Save Draft</button>
           </div>
         );
-      case 9:
+      case "saved":
         return (
           <div data-testid="wizard-saved-step" className="space-y-6 text-center py-8">
             <ShieldCheck size={48} className="mx-auto text-green-600" />
@@ -427,8 +555,19 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
   };
 
   const goNext = () => {
-    if (canContinue()) setStep(current => Math.min(current + 1, steps.length));
+    if (!canContinue()) return;
+    const next = activeStepIds[currentIndex + 1];
+    if (next) setStepId(next);
   };
+  const goBack = () => {
+    const prev = activeStepIds[currentIndex - 1];
+    if (prev) setStepId(prev);
+  };
+
+  const visibleStepIds = visibleSteps.map(step => step.id);
+  const visibleIndex = visibleStepIds.indexOf(safeStepId);
+  const showSaveFooter = safeStepId === "save";
+  const showStandardFooter = safeStepId !== "saved" && safeStepId !== "save";
 
   return (
     <div data-testid="wizard-page" className="max-w-3xl mx-auto space-y-8">
@@ -437,24 +576,32 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
           Creating {initialContext.direction ? `${initialContext.direction} ` : ""}integration{initialContext.campaignId ? " for this campaign" : ""}.
         </div>
       )}
-      <div className="grid grid-cols-9 gap-1">
-        {steps.map((label, index) => {
-          const s = index + 1;
+      <div
+        className="gap-1"
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${visibleSteps.length}, minmax(0, 1fr))`,
+        }}
+        data-testid="wizard-breadcrumb"
+      >
+        {visibleSteps.map((step, index) => {
+          const isCurrent = step.id === safeStepId;
+          const isPast = visibleIndex > index;
           return (
-            <div key={label} className="text-center">
-              <div className={`mx-auto w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${step === s ? "bg-purple-600 text-white" : step > s ? "bg-green-500 text-white" : "bg-slate-200 text-slate-500"}`}>
-                {step > s ? <Check size={12} /> : s}
+            <div key={step.id} className="text-center" data-testid={`wizard-breadcrumb-${step.id}`}>
+              <div className={`mx-auto w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${isCurrent ? "bg-purple-600 text-white" : isPast ? "bg-green-500 text-white" : "bg-slate-200 text-slate-500"}`}>
+                {isPast ? <Check size={12} /> : index + 1}
               </div>
-              <p className="mt-1 text-[10px] text-slate-500 hidden md:block">{label}</p>
+              <p className="mt-1 text-[10px] text-slate-500 hidden md:block">{step.label}</p>
             </div>
           );
         })}
       </div>
       <Card>
         {renderStep()}
-        {step < 9 && step !== 8 && (
+        {showStandardFooter && (
           <div className="mt-8 flex items-center justify-between">
-            <button data-testid="wizard-back-button" onClick={() => setStep(current => Math.max(1, current - 1))} disabled={step === 1} className="flex items-center gap-2 text-sm text-slate-500 disabled:opacity-40">
+            <button data-testid="wizard-back-button" onClick={goBack} disabled={currentIndex <= 0} className="flex items-center gap-2 text-sm text-slate-500 disabled:opacity-40">
               <ArrowLeft size={16} /> Back
             </button>
             <button data-testid="wizard-continue-button" onClick={goNext} disabled={!canContinue()} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">
@@ -462,8 +609,8 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             </button>
           </div>
         )}
-        {step === 8 && (
-          <button onClick={() => setStep(7)} className="mt-8 flex items-center gap-2 text-sm text-slate-500">
+        {showSaveFooter && (
+          <button onClick={goBack} className="mt-8 flex items-center gap-2 text-sm text-slate-500">
             <ArrowLeft size={16} /> Back
           </button>
         )}
@@ -528,6 +675,64 @@ const NumberField = ({ label, value, onChange }: { label: string; value: number;
     <input type="number" className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={value || ""} onChange={event => onChange(Number(event.target.value))} />
   </label>
 );
+
+const WizardNumberStatus: React.FC<{ value: string }> = ({ value }) => {
+  if (!value) {
+    return (
+      <p
+        data-testid="wizard-direct-number-status"
+        data-status="empty"
+        className="text-[11px] italic text-slate-500"
+      >
+        Destination number is required.
+      </p>
+    );
+  }
+  const result = validatePhoneNumber(value);
+  return (
+    <p
+      data-testid="wizard-direct-number-status"
+      data-status={result.valid ? "valid" : "invalid"}
+      className={`text-[11px] italic ${result.valid ? "text-green-600" : "text-red-600"}`}
+    >
+      {result.valid ? "Looks valid." : result.message || "Invalid number."}
+    </p>
+  );
+};
+
+const WizardSipStatus: React.FC<{ value: string }> = ({ value }) => {
+  if (!value) {
+    return (
+      <p
+        data-testid="wizard-direct-sip-status"
+        data-status="empty"
+        className="text-[11px] italic text-slate-500"
+      >
+        SIP address is required.
+      </p>
+    );
+  }
+  const result = validateSipAddress(value);
+  return (
+    <p
+      data-testid="wizard-direct-sip-status"
+      data-status={result.valid ? "valid" : "invalid"}
+      className={`text-[11px] italic ${result.valid ? "text-green-600" : "text-red-600"}`}
+    >
+      {result.valid ? "Looks valid." : result.message || "Invalid SIP address."}
+    </p>
+  );
+};
+
+function defaultDirectTargetSchedule() {
+  return {
+    timezone: "America/New_York",
+    days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    startTime: "00:00",
+    endTime: "23:59",
+    mode: "always_open" as const,
+  };
+}
 
 function slugify(value: string): string {
   // Lowercase, then collapse any run of non [a-z0-9] into single underscores,

@@ -10,6 +10,8 @@ import type {
   FilterRule,
   Integration,
   IntegrationConfig,
+  IntegrationSchedule,
+  IntegrationScheduleDayRule,
   PredictiveRoutingConfig,
   RecordingSettings,
   RequestConfig,
@@ -190,3 +192,106 @@ export const TIMEZONE_OPTIONS = [
 ] as const;
 
 export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+export type ScheduleMode = "always_open" | "basic" | "advanced";
+
+export interface NormalizedSchedule {
+  timezone: string;
+  mode: ScheduleMode;
+  dayRules: IntegrationScheduleDayRule[];
+}
+
+const DEFAULT_TIMEZONE = "America/New_York";
+const DEFAULT_OPEN = "09:00";
+const DEFAULT_CLOSE = "17:00";
+
+/**
+ * Returns a canonical schedule with a `dayRules` entry for every weekday.
+ * Synthesizes `dayRules` from legacy `days` / `startTime` / `endTime` when needed
+ * so the UI doesn't have to handle two shapes.
+ *
+ * Reading is non-destructive: callers can `normalizeSchedule(integration.config.schedule)`
+ * without mutating the stored schedule.
+ */
+export function normalizeSchedule(schedule: IntegrationSchedule | undefined): NormalizedSchedule {
+  const mode: ScheduleMode = schedule?.mode || "basic";
+  const timezone = schedule?.timezone || DEFAULT_TIMEZONE;
+
+  // If `dayRules` are explicitly set, honor them and pad missing days as disabled.
+  if (schedule?.dayRules && schedule.dayRules.length > 0) {
+    const byDay = new Map<string, IntegrationScheduleDayRule>();
+    for (const rule of schedule.dayRules) byDay.set(rule.day, rule);
+    const dayRules = WEEKDAYS.map(day => {
+      const existing = byDay.get(day);
+      if (existing) return { ...existing };
+      return {
+        day,
+        enabled: false,
+        startTime: schedule.startTime || DEFAULT_OPEN,
+        endTime: schedule.endTime || DEFAULT_CLOSE,
+      };
+    });
+    return { timezone, mode, dayRules };
+  }
+
+  // Synthesize from legacy `days` + shared `startTime`/`endTime`.
+  const enabledDays = new Set(schedule?.days || []);
+  const startTime = schedule?.startTime || DEFAULT_OPEN;
+  const endTime = schedule?.endTime || DEFAULT_CLOSE;
+  const alwaysOpen = mode === "always_open";
+  const dayRules = WEEKDAYS.map(day => ({
+    day,
+    enabled: alwaysOpen ? true : enabledDays.has(day),
+    startTime,
+    endTime,
+  }));
+  return { timezone, mode, dayRules };
+}
+
+/**
+ * Inverse of `normalizeSchedule`: produces a persistence-shape `IntegrationSchedule`
+ * with BOTH the canonical `dayRules` AND the legacy `days`/`startTime`/`endTime`
+ * fields populated so old readers keep working.
+ *
+ * For basic mode, the legacy startTime/endTime are taken from the first enabled
+ * rule (every enabled rule shares the same hours in basic mode). For advanced
+ * mode with non-uniform hours, legacy startTime/endTime collapse to the most
+ * frequent enabled-day values (or the first enabled rule if all unique).
+ */
+export function denormalizeSchedule(normalized: NormalizedSchedule): IntegrationSchedule {
+  const enabledRules = normalized.dayRules.filter(rule => rule.enabled);
+  const days = enabledRules.map(rule => rule.day);
+  const legacyTimes = pickDominantTimes(enabledRules);
+
+  return {
+    timezone: normalized.timezone,
+    mode: normalized.mode,
+    days,
+    startTime: legacyTimes.startTime,
+    endTime: legacyTimes.endTime,
+    dayRules: normalized.dayRules,
+  };
+}
+
+function pickDominantTimes(
+  rules: IntegrationScheduleDayRule[]
+): { startTime: string; endTime: string } {
+  if (rules.length === 0) {
+    return { startTime: DEFAULT_OPEN, endTime: DEFAULT_CLOSE };
+  }
+  const counts = new Map<string, number>();
+  for (const rule of rules) {
+    const key = `${rule.startTime || DEFAULT_OPEN}|${rule.endTime || DEFAULT_CLOSE}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  let bestKey = `${rules[0].startTime || DEFAULT_OPEN}|${rules[0].endTime || DEFAULT_CLOSE}`;
+  let bestCount = -1;
+  for (const [key, count] of counts.entries()) {
+    if (count > bestCount) {
+      bestKey = key;
+      bestCount = count;
+    }
+  }
+  const [startTime, endTime] = bestKey.split("|");
+  return { startTime, endTime };
+}

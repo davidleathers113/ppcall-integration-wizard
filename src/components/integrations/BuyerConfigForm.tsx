@@ -28,6 +28,7 @@ import {
   FILTER_FIELDS,
   TIMEZONE_OPTIONS,
   WEEKDAYS,
+  denormalizeSchedule,
   inferBuyerDestinationKind,
   inferCallHandling,
   inferCapUsage,
@@ -43,6 +44,8 @@ import {
   inferRevenueSettings,
   inferShareableTags,
   isDirectTargetKind,
+  normalizeSchedule,
+  type NormalizedSchedule,
 } from "../../utils/buyerConfigDefaults";
 import TokenPicker from "../shared/TokenPicker";
 import { createId } from "../../utils/id";
@@ -840,10 +843,34 @@ const CapsScheduleSection: React.FC<{
   updateSchedule: (partial: Partial<IntegrationSchedule>) => void;
   updateCapUsage: (next: CapUsage) => void;
 }> = ({ caps, schedule, capUsage, updateCaps, updateSchedule, updateCapUsage }) => {
-  const days = schedule?.days || [];
+  const normalized = normalizeSchedule(schedule);
+  // Drive basic-mode UI off the canonical dayRules so basic+advanced share state.
+  const enabledDays = normalized.dayRules.filter(rule => rule.enabled).map(rule => rule.day);
+  const sharedTimes = normalized.dayRules.find(rule => rule.enabled);
+  const sharedStart = sharedTimes?.startTime || "09:00";
+  const sharedEnd = sharedTimes?.endTime || "17:00";
+  const writeSchedule = (next: NormalizedSchedule) => {
+    updateSchedule(denormalizeSchedule(next));
+  };
   const toggleDay = (day: string) => {
-    const next = days.includes(day) ? days.filter(item => item !== day) : [...days, day];
-    updateSchedule({ days: next });
+    const next: NormalizedSchedule = {
+      ...normalized,
+      dayRules: normalized.dayRules.map(rule =>
+        rule.day === day
+          ? { ...rule, enabled: !rule.enabled, startTime: sharedStart, endTime: sharedEnd }
+          : rule
+      ),
+    };
+    writeSchedule(next);
+  };
+  const updateSharedTime = (which: "startTime" | "endTime", value: string) => {
+    const next: NormalizedSchedule = {
+      ...normalized,
+      dayRules: normalized.dayRules.map(rule =>
+        rule.enabled ? { ...rule, [which]: value } : rule
+      ),
+    };
+    writeSchedule(next);
   };
   return (
     <section className="space-y-6">
@@ -953,7 +980,7 @@ const CapsScheduleSection: React.FC<{
                     data-testid={`schedule-day-${day}`}
                     onClick={() => toggleDay(day)}
                     className={`px-3 py-1 text-xs border rounded ${
-                      days.includes(day)
+                      enabledDays.includes(day)
                         ? "bg-purple-600 text-white border-purple-600"
                         : "text-slate-600 border-slate-200 hover:border-purple-300"
                     }`}
@@ -967,20 +994,26 @@ const CapsScheduleSection: React.FC<{
               <TextField
                 label="Open Time"
                 testId="schedule-start"
-                value={schedule?.startTime || "09:00"}
-                onChange={value => updateSchedule({ startTime: value })}
+                value={sharedStart}
+                onChange={value => updateSharedTime("startTime", value)}
               />
               <TextField
                 label="Close Time"
                 testId="schedule-end"
-                value={schedule?.endTime || "17:00"}
-                onChange={value => updateSchedule({ endTime: value })}
+                value={sharedEnd}
+                onChange={value => updateSharedTime("endTime", value)}
               />
             </div>
+            <p className="text-[11px] text-slate-400 italic">
+              Basic mode applies one open/close time across every enabled day.
+            </p>
           </div>
         )}
         {(schedule?.mode || "basic") === "advanced" && (
-          <AdvancedScheduleEditor schedule={schedule} updateSchedule={updateSchedule} />
+          <AdvancedScheduleEditor
+            normalized={normalized}
+            writeSchedule={writeSchedule}
+          />
         )}
       </div>
     </section>
@@ -988,23 +1021,17 @@ const CapsScheduleSection: React.FC<{
 };
 
 const AdvancedScheduleEditor: React.FC<{
-  schedule?: IntegrationSchedule;
-  updateSchedule: (partial: Partial<IntegrationSchedule>) => void;
-}> = ({ schedule, updateSchedule }) => {
-  const dayRules = WEEKDAYS.map(day => {
-    const existing = schedule?.dayRules?.find(rule => rule.day === day);
-    return (
-      existing || {
-        day,
-        enabled: false,
-        startTime: schedule?.startTime || "09:00",
-        endTime: schedule?.endTime || "17:00",
-      }
-    );
-  });
+  normalized: NormalizedSchedule;
+  writeSchedule: (next: NormalizedSchedule) => void;
+}> = ({ normalized, writeSchedule }) => {
   const updateRule = (day: string, partial: Partial<IntegrationScheduleDayRule>) => {
-    const next = dayRules.map(rule => (rule.day === day ? { ...rule, ...partial } : rule));
-    updateSchedule({ dayRules: next });
+    const next: NormalizedSchedule = {
+      ...normalized,
+      dayRules: normalized.dayRules.map(rule =>
+        rule.day === day ? { ...rule, ...partial } : rule
+      ),
+    };
+    writeSchedule(next);
   };
   return (
     <div data-testid="schedule-advanced-editor" className="space-y-2">
@@ -1013,7 +1040,7 @@ const AdvancedScheduleEditor: React.FC<{
         Enable the days this buyer accepts calls and set per-day open/close times.
       </p>
       <div className="border rounded-lg divide-y divide-slate-100">
-        {dayRules.map(rule => (
+        {normalized.dayRules.map(rule => (
           <div
             key={rule.day}
             data-testid={`schedule-day-rule-${rule.day}`}

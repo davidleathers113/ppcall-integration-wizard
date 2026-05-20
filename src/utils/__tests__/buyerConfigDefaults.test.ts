@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Integration } from "../../models/appTypes";
 import {
+  denormalizeSchedule,
   inferDestination,
   inferDestinationMode,
   inferDialIvr,
@@ -10,6 +11,7 @@ import {
   inferRecordingSettings,
   inferRequest,
   inferRevenueSettings,
+  normalizeSchedule,
 } from "../buyerConfigDefaults";
 
 function integration(overrides: Partial<Integration> = {}): Integration {
@@ -107,5 +109,119 @@ describe("buyerConfigDefaults", () => {
     });
     expect(revenue.mode).toBe("override");
     expect(revenue.payout).toBe(25);
+  });
+});
+
+describe("normalizeSchedule", () => {
+  it("returns 7 disabled days for undefined input", () => {
+    const normalized = normalizeSchedule(undefined);
+    expect(normalized.dayRules).toHaveLength(7);
+    expect(normalized.dayRules.every(rule => !rule.enabled)).toBe(true);
+    expect(normalized.timezone).toBe("America/New_York");
+    expect(normalized.mode).toBe("basic");
+  });
+
+  it("synthesizes dayRules from legacy days+startTime+endTime in basic mode", () => {
+    const normalized = normalizeSchedule({
+      timezone: "America/Chicago",
+      days: ["Mon", "Wed", "Fri"],
+      startTime: "08:30",
+      endTime: "18:00",
+      mode: "basic",
+    });
+    expect(normalized.timezone).toBe("America/Chicago");
+    expect(normalized.dayRules).toHaveLength(7);
+    const enabled = normalized.dayRules.filter(rule => rule.enabled);
+    expect(enabled.map(r => r.day)).toEqual(["Mon", "Wed", "Fri"]);
+    expect(enabled.every(r => r.startTime === "08:30")).toBe(true);
+    expect(enabled.every(r => r.endTime === "18:00")).toBe(true);
+  });
+
+  it("enables all days for always_open mode", () => {
+    const normalized = normalizeSchedule({
+      timezone: "UTC",
+      days: [],
+      startTime: "00:00",
+      endTime: "23:59",
+      mode: "always_open",
+    });
+    expect(normalized.dayRules.every(rule => rule.enabled)).toBe(true);
+  });
+
+  it("honors explicit dayRules and pads missing days as disabled", () => {
+    const normalized = normalizeSchedule({
+      timezone: "America/New_York",
+      days: [],
+      startTime: "09:00",
+      endTime: "17:00",
+      mode: "advanced",
+      dayRules: [
+        { day: "Mon", enabled: true, startTime: "07:00", endTime: "13:00" },
+        { day: "Tue", enabled: true, startTime: "13:00", endTime: "20:00" },
+      ],
+    });
+    const byDay = Object.fromEntries(normalized.dayRules.map(r => [r.day, r]));
+    expect(byDay.Mon.startTime).toBe("07:00");
+    expect(byDay.Tue.endTime).toBe("20:00");
+    expect(byDay.Sat.enabled).toBe(false);
+  });
+});
+
+describe("denormalizeSchedule", () => {
+  it("round-trips a basic schedule and preserves legacy fields", () => {
+    const original = normalizeSchedule({
+      timezone: "America/Chicago",
+      days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+      startTime: "08:00",
+      endTime: "18:00",
+      mode: "basic",
+    });
+    const denormalized = denormalizeSchedule(original);
+    expect(denormalized.timezone).toBe("America/Chicago");
+    expect(denormalized.mode).toBe("basic");
+    expect(denormalized.days).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+    expect(denormalized.startTime).toBe("08:00");
+    expect(denormalized.endTime).toBe("18:00");
+    expect(denormalized.dayRules?.find(r => r.day === "Mon")?.enabled).toBe(true);
+  });
+
+  it("picks dominant times when advanced schedule has non-uniform hours", () => {
+    const denormalized = denormalizeSchedule({
+      timezone: "UTC",
+      mode: "advanced",
+      dayRules: [
+        { day: "Mon", enabled: true, startTime: "09:00", endTime: "17:00" },
+        { day: "Tue", enabled: true, startTime: "09:00", endTime: "17:00" },
+        { day: "Wed", enabled: true, startTime: "09:00", endTime: "17:00" },
+        { day: "Thu", enabled: true, startTime: "10:00", endTime: "20:00" },
+        { day: "Fri", enabled: false },
+        { day: "Sat", enabled: false },
+        { day: "Sun", enabled: false },
+      ],
+    });
+    // Dominant times are 09:00–17:00 (3 days vs 1).
+    expect(denormalized.startTime).toBe("09:00");
+    expect(denormalized.endTime).toBe("17:00");
+    // dayRules preserved verbatim.
+    expect(denormalized.dayRules?.[3].startTime).toBe("10:00");
+  });
+
+  it("uses default fallback times when no day is enabled", () => {
+    const denormalized = denormalizeSchedule({
+      timezone: "UTC",
+      mode: "basic",
+      dayRules: [
+        { day: "Mon", enabled: false },
+        { day: "Tue", enabled: false },
+        { day: "Wed", enabled: false },
+        { day: "Thu", enabled: false },
+        { day: "Fri", enabled: false },
+        { day: "Sat", enabled: false },
+        { day: "Sun", enabled: false },
+      ],
+    });
+    expect(denormalized.days).toEqual([]);
+    expect(denormalized.startTime).toBe("09:00");
+    expect(denormalized.endTime).toBe("17:00");
   });
 });
