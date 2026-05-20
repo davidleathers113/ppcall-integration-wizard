@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
 
       <div className="p-4 border-t border-slate-800 text-xs text-slate-500">
         <p>Mock Environment v1.0</p>
-        <p>© 2026 PPCall Integration Wizard</p>
+        <p>© 2026 Self-Service PPCall Integration Studio</p>
       </div>
     </aside>
   );

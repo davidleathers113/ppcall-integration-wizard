@@ -185,7 +185,7 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
           </div>
         );
       default:
-        return <div className="p-12 text-center text-slate-400">Coming soon...</div>;
+        return null;
     }
   };
 
