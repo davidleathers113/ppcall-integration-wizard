@@ -129,7 +129,52 @@ export const MOCK_INTEGRATIONS: Integration[] = [
       postingUrl: "https://mock-ppcall.local/rtb/camp_hvac/pub_abc",
       publisherId: "pub_abc",
       requiredFields: ["caller_id", "zip"],
-      expiresInSeconds: 30
+      expiresInSeconds: 30,
+      publisherSources: [
+        {
+          id: "src_abc_google",
+          name: "Google Search",
+          publisherId: "pub_abc",
+          sourceId: "google_search",
+          subAffiliateId: "sub_google_01",
+          status: "active",
+          requiredFields: ["caller_id", "zip"],
+          postingUrl: "https://mock-ppcall.local/rtb/camp_hvac/pub_abc/google",
+          caps: { daily: 300, hourly: 40 },
+          payoutOverride: 28,
+          lastUsedAt: "2026-05-19T14:20:00Z",
+          usageCount: 760,
+          errorRate: 0.01
+        },
+        {
+          id: "src_abc_facebook",
+          name: "Facebook Lead Ads",
+          publisherId: "pub_abc",
+          sourceId: "facebook",
+          subAffiliateId: "sub_fb_22",
+          status: "active",
+          requiredFields: ["caller_id", "zip", "state"],
+          postingUrl: "https://mock-ppcall.local/rtb/camp_hvac/pub_abc/facebook",
+          caps: { daily: 200, hourly: 25 },
+          lastUsedAt: "2026-05-18T16:00:00Z",
+          usageCount: 390,
+          errorRate: 0.03
+        },
+        {
+          id: "src_abc_native",
+          name: "Native Display",
+          publisherId: "pub_abc",
+          sourceId: "native",
+          subAffiliateId: "sub_native_08",
+          status: "dormant",
+          requiredFields: ["caller_id", "zip"],
+          postingUrl: "https://mock-ppcall.local/rtb/camp_hvac/pub_abc/native",
+          caps: { daily: 100 },
+          lastUsedAt: "2026-05-08T09:00:00Z",
+          usageCount: 100,
+          errorRate: 0.04
+        }
+      ]
     },
     createdAt: "2026-01-11T09:00:00Z",
     createdBy: "Sarah",
@@ -152,7 +197,66 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     status: "active",
     config: {
       ...PRESETS.ringba_rtb.config,
-      url: "https://premier-home-services.example/ping"
+      url: "https://premier-home-services.example/ping",
+      routing: { strategy: "priority", fallbackTargetId: "target_premier_after_hours" },
+      buyerTargets: [
+        {
+          id: "target_premier_tampa",
+          name: "Tampa RTB Endpoint",
+          status: "active",
+          priority: 1,
+          weight: 70,
+          type: "rtb",
+          config: {
+            ...PRESETS.ringba_rtb.config,
+            url: "https://premier-home-services.example/tampa/ping"
+          },
+          caps: { daily: 500, hourly: 60 },
+          schedule: { timezone: "America/New_York", days: ["Mon", "Tue", "Wed", "Thu", "Fri"], startTime: "08:00", endTime: "18:00" },
+          lastTestedAt: "2026-05-19T10:00:00Z",
+          lastSuccessfulTestAt: "2026-05-19T10:00:00Z",
+          lastUsedAt: "2026-05-19T15:10:00Z",
+          usageCount: 520,
+          errorRate: 0.03
+        },
+        {
+          id: "target_premier_orlando",
+          name: "Orlando Static Number",
+          status: "active",
+          priority: 2,
+          weight: 20,
+          type: "static_number",
+          config: {
+            destinationNumber: "+14075550123",
+            payout: 30,
+            conversionDurationSeconds: 90
+          },
+          caps: { daily: 120 },
+          lastTestedAt: "2026-05-18T13:00:00Z",
+          lastSuccessfulTestAt: "2026-05-18T13:00:00Z",
+          lastUsedAt: "2026-05-19T12:00:00Z",
+          usageCount: 230,
+          errorRate: 0.02
+        },
+        {
+          id: "target_premier_after_hours",
+          name: "After Hours SIP Transfer",
+          status: "test_passed",
+          priority: 3,
+          weight: 10,
+          type: "sip",
+          config: {
+            sipAddress: "sip:afterhours@premier.example",
+            payout: 22,
+            conversionDurationSeconds: 120
+          },
+          schedule: { timezone: "America/New_York", days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], startTime: "18:00", endTime: "08:00" },
+          lastTestedAt: "2026-05-18T21:00:00Z",
+          lastSuccessfulTestAt: "2026-05-18T21:00:00Z",
+          usageCount: 90,
+          errorRate: 0
+        }
+      ]
     },
     createdAt: "2026-01-11T11:00:00Z",
     createdBy: "Sarah",
@@ -176,7 +280,21 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     config: {
       destinationNumber: "+18885550101",
       publisherId: "pub_leadflow",
-      requiredFields: ["caller_id"]
+      requiredFields: ["caller_id"],
+      publisherSources: [
+        {
+          id: "src_leadflow_seo",
+          name: "SEO Calls",
+          publisherId: "pub_leadflow",
+          sourceId: "seo",
+          status: "stale",
+          requiredFields: ["caller_id"],
+          postingUrl: "tel:+18885550101",
+          lastUsedAt: "2026-03-10T11:00:00Z",
+          usageCount: 45,
+          errorRate: 0
+        }
+      ]
     },
     createdAt: "2026-02-16T10:00:00Z",
     createdBy: "Mike",
@@ -198,7 +316,44 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     status: "failing",
     config: {
       ...PRESETS.generic_json_post.config,
-      url: "https://coastal-plumbing.api/ping"
+      url: "https://coastal-plumbing.api/ping",
+      routing: { strategy: "weighted" },
+      buyerTargets: [
+        {
+          id: "target_coastal_primary",
+          name: "Primary Ping Endpoint",
+          status: "failing",
+          priority: 1,
+          weight: 80,
+          type: "generic_api",
+          config: {
+            ...PRESETS.generic_json_post.config,
+            url: "https://coastal-plumbing.api/ping"
+          },
+          caps: { daily: 250 },
+          lastTestedAt: "2026-05-18T10:00:00Z",
+          lastUsedAt: "2026-05-18T10:05:00Z",
+          usageCount: 180,
+          errorRate: 0.45
+        },
+        {
+          id: "target_coastal_backup",
+          name: "Backup Static Number",
+          status: "test_passed",
+          priority: 2,
+          weight: 20,
+          type: "static_number",
+          config: {
+            destinationNumber: "+18885550999",
+            payout: 18,
+            conversionDurationSeconds: 60
+          },
+          lastTestedAt: "2026-05-17T08:00:00Z",
+          lastSuccessfulTestAt: "2026-05-17T08:00:00Z",
+          usageCount: 30,
+          errorRate: 0
+        }
+      ]
     },
     createdAt: "2026-02-16T14:00:00Z",
     createdBy: "Mike",
@@ -222,7 +377,21 @@ export const MOCK_INTEGRATIONS: Integration[] = [
       postingUrl: "https://mock-ppcall.local/rtb/camp_ssdi/pub_search",
       publisherId: "pub_search",
       requiredFields: ["caller_id", "state"],
-      expiresInSeconds: 30
+      expiresInSeconds: 30,
+      publisherSources: [
+        {
+          id: "src_search_ppc",
+          name: "Search PPC",
+          publisherId: "pub_search",
+          sourceId: "ppc",
+          subAffiliateId: "legal_search",
+          status: "needs_testing",
+          requiredFields: ["caller_id", "state"],
+          postingUrl: "https://mock-ppcall.local/rtb/camp_ssdi/pub_search/ppc",
+          usageCount: 0,
+          errorRate: 0
+        }
+      ]
     },
     createdAt: "2026-03-21T09:00:00Z",
     createdBy: "Sarah",
@@ -239,7 +408,24 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     type: "sip",
     platformPreset: "sip_endpoint",
     status: "test_passed",
-    config: PRESETS.sip_endpoint.config,
+    config: {
+      ...PRESETS.sip_endpoint.config,
+      buyerTargets: [
+        {
+          id: "target_disability_intake",
+          name: "Main Intake SIP",
+          status: "test_passed",
+          priority: 1,
+          weight: 100,
+          type: "sip",
+          config: PRESETS.sip_endpoint.config,
+          lastTestedAt: "2026-03-21T11:30:00Z",
+          lastSuccessfulTestAt: "2026-03-21T11:30:00Z",
+          usageCount: 0,
+          errorRate: 0
+        }
+      ]
+    },
     createdAt: "2026-03-21T11:00:00Z",
     createdBy: "Sarah",
     updatedAt: "2026-03-21T11:00:00Z",

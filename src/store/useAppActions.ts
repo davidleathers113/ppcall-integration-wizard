@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ActivityEvent, Campaign, Integration, IntegrationConfig, TestRun } from "../models/appTypes";
+import type { ActivityEvent, BuyerTarget, Campaign, Integration, IntegrationConfig, PublisherSource, TestRun } from "../models/appTypes";
 import { nowIso } from "../utils/clock";
 import { createId } from "../utils/id";
 import { simulateIntegrationTest } from "../utils/testSimulation";
@@ -84,6 +84,108 @@ export function useAppActions() {
       dispatch({ type: "UPDATE_INTEGRATION", payload: updated });
       dispatch({ type: "ADD_ACTIVITY", payload: activity(updated, "updated", meta.message || `Updated ${updated.name}.`, actor, at) });
       return updated;
+    },
+
+    createPublisherSource(integrationId: string, input: Omit<PublisherSource, "id" | "usageCount" | "errorRate" | "status"> & Partial<Pick<PublisherSource, "status" | "usageCount" | "errorRate">>, meta: ActionMeta = {}) {
+      const integration = selectIntegrationById(state, integrationId);
+      if (!integration) return undefined;
+      const source: PublisherSource = {
+        id: createId("src"),
+        status: input.status || "draft",
+        usageCount: input.usageCount || 0,
+        errorRate: input.errorRate || 0,
+        ...input
+      };
+      const updated = {
+        ...integration,
+        config: {
+          ...integration.config,
+          publisherSources: [...(integration.config.publisherSources || []), source]
+        }
+      };
+      this.updateIntegration(integrationId, { config: updated.config }, { actor: meta.actor, message: meta.message || `Added publisher source ${source.name}.` });
+      return source;
+    },
+
+    updatePublisherSource(integrationId: string, sourceId: string, patch: Partial<PublisherSource>, meta: ActionMeta = {}) {
+      const integration = selectIntegrationById(state, integrationId);
+      if (!integration) return undefined;
+      const sources = integration.config.publisherSources || [];
+      const source = sources.find(item => item.id === sourceId);
+      if (!source) return undefined;
+      const updatedSource = { ...source, ...patch };
+      this.updateIntegration(integrationId, {
+        config: {
+          ...integration.config,
+          publisherSources: sources.map(item => item.id === sourceId ? updatedSource : item)
+        }
+      }, { actor: meta.actor, message: meta.message || `Updated publisher source ${updatedSource.name}.` });
+      return updatedSource;
+    },
+
+    archivePublisherSource(integrationId: string, sourceId: string, meta: ActionMeta = {}) {
+      return this.updatePublisherSource(integrationId, sourceId, { status: "archived" }, meta);
+    },
+
+    createBuyerTarget(integrationId: string, input: Omit<BuyerTarget, "id" | "usageCount" | "errorRate" | "status"> & Partial<Pick<BuyerTarget, "status" | "usageCount" | "errorRate">>, meta: ActionMeta = {}) {
+      const integration = selectIntegrationById(state, integrationId);
+      if (!integration) return undefined;
+      const target: BuyerTarget = {
+        id: createId("target"),
+        status: input.status || "draft",
+        usageCount: input.usageCount || 0,
+        errorRate: input.errorRate || 0,
+        ...input
+      };
+      this.updateIntegration(integrationId, {
+        config: {
+          ...integration.config,
+          buyerTargets: [...(integration.config.buyerTargets || []), target]
+        }
+      }, { actor: meta.actor, message: meta.message || `Added buyer target ${target.name}.` });
+      return target;
+    },
+
+    updateBuyerTarget(integrationId: string, targetId: string, patch: Partial<BuyerTarget>, meta: ActionMeta = {}) {
+      const integration = selectIntegrationById(state, integrationId);
+      if (!integration) return undefined;
+      const targets = integration.config.buyerTargets || [];
+      const target = targets.find(item => item.id === targetId);
+      if (!target) return undefined;
+      const updatedTarget = { ...target, ...patch };
+      this.updateIntegration(integrationId, {
+        config: {
+          ...integration.config,
+          buyerTargets: targets.map(item => item.id === targetId ? updatedTarget : item)
+        }
+      }, { actor: meta.actor, message: meta.message || `Updated buyer target ${updatedTarget.name}.` });
+      return updatedTarget;
+    },
+
+    archiveBuyerTarget(integrationId: string, targetId: string, meta: ActionMeta = {}) {
+      return this.updateBuyerTarget(integrationId, targetId, { status: "archived" }, meta);
+    },
+
+    markPublisherSourceUsed(integrationId: string, sourceId: string) {
+      const integration = selectIntegrationById(state, integrationId);
+      const source = integration?.config.publisherSources?.find(item => item.id === sourceId);
+      if (!integration || !source) return;
+      const at = nowIso();
+      this.updatePublisherSource(integrationId, sourceId, {
+        usageCount: source.usageCount + 1,
+        lastUsedAt: at
+      }, { actor: "System", message: `Marked publisher source ${source.name} as used.` });
+    },
+
+    markBuyerTargetUsed(integrationId: string, targetId: string) {
+      const integration = selectIntegrationById(state, integrationId);
+      const target = integration?.config.buyerTargets?.find(item => item.id === targetId);
+      if (!integration || !target) return;
+      const at = nowIso();
+      this.updateBuyerTarget(integrationId, targetId, {
+        usageCount: target.usageCount + 1,
+        lastUsedAt: at
+      }, { actor: "System", message: `Marked buyer target ${target.name} as used.` });
     },
 
     runIntegrationTest(id: string, inputTokens?: Record<string, string>) {

@@ -30,6 +30,51 @@ export type IntegrationStatus =
   | "paused"
   | "archived";
 
+export interface IntegrationCaps {
+  daily?: number;
+  hourly?: number;
+}
+
+export interface IntegrationSchedule {
+  timezone: string;
+  days: string[];
+  startTime: string;
+  endTime: string;
+}
+
+export interface PublisherSource {
+  id: string;
+  name: string;
+  publisherId: string;
+  sourceId?: string;
+  subAffiliateId?: string;
+  status: IntegrationStatus;
+  requiredFields: string[];
+  postingUrl?: string;
+  caps?: IntegrationCaps;
+  payoutOverride?: number;
+  lastUsedAt?: string;
+  usageCount: number;
+  errorRate: number;
+}
+
+export interface BuyerTarget {
+  id: string;
+  name: string;
+  status: IntegrationStatus;
+  priority: number;
+  weight: number;
+  type: IntegrationType;
+  config: IntegrationConfig;
+  caps?: IntegrationCaps;
+  schedule?: IntegrationSchedule;
+  lastTestedAt?: string;
+  lastSuccessfulTestAt?: string;
+  lastUsedAt?: string;
+  usageCount: number;
+  errorRate: number;
+}
+
 export interface IntegrationConfig {
   method?: "GET" | "POST";
   url?: string;
@@ -57,15 +102,13 @@ export interface IntegrationConfig {
   expiresInSeconds?: number;
   payout?: number;
   conversionDurationSeconds?: number;
-  caps?: {
-    daily?: number;
-    hourly?: number;
-  };
-  schedule?: {
-    timezone: string;
-    days: string[];
-    startTime: string;
-    endTime: string;
+  caps?: IntegrationCaps;
+  schedule?: IntegrationSchedule;
+  publisherSources?: PublisherSource[];
+  buyerTargets?: BuyerTarget[];
+  routing?: {
+    strategy: "priority" | "weighted" | "round_robin" | "waterfall";
+    fallbackTargetId?: string;
   };
 }
 
@@ -117,8 +160,11 @@ export interface ActivityEvent {
     | "created"
     | "updated"
     | "tested"
+    | "target_tested"
     | "activated"
     | "used"
+    | "source_used"
+    | "target_used"
     | "failed"
     | "paused"
     | "archived"

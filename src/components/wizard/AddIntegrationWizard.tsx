@@ -5,6 +5,7 @@ import { PRESETS } from "../../data/mockData";
 import type { IntegrationConfig, IntegrationDirection, IntegrationType } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { createId } from "../../utils/id";
 
 interface AddIntegrationWizardProps {
   onComplete?: (id: string) => void;
@@ -93,6 +94,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
 
   const saveDraft = () => {
     if (!direction || !type || !campaignId || !integrationName.trim()) return;
+    const configToSave = buildConfigWithDefaultChild(normalizedConfig, direction, type, integrationName.trim());
     const integration = actions.createIntegration({
       campaignId,
       name: integrationName.trim(),
@@ -100,7 +102,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
       type,
       platformPreset: selectedPreset,
       status: "draft",
-      config: normalizedConfig
+      config: configToSave
     });
     setSavedIntegrationId(integration.id);
     setMessage("Draft created. Run a test before activation.");
@@ -347,6 +349,49 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
     </div>
   );
 };
+
+function buildConfigWithDefaultChild(config: IntegrationConfig, direction: IntegrationDirection, type: IntegrationType, name: string): IntegrationConfig {
+  if (direction === "publisher" && !config.publisherSources?.length) {
+    return {
+      ...config,
+      publisherSources: [{
+        id: createId("src"),
+        name: `${name} Default Source`,
+        publisherId: config.publisherId || `pub_${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+        sourceId: "default",
+        status: "draft",
+        requiredFields: config.requiredFields || ["caller_id", "zip"],
+        postingUrl: config.postingUrl,
+        caps: config.caps,
+        usageCount: 0,
+        errorRate: 0
+      }]
+    };
+  }
+
+  if (direction === "buyer" && !config.buyerTargets?.length) {
+    const targetConfig: IntegrationConfig = { ...config, buyerTargets: undefined, routing: undefined };
+    return {
+      ...config,
+      routing: config.routing || { strategy: "priority" },
+      buyerTargets: [{
+        id: createId("target"),
+        name: `${name} Default Target`,
+        status: "draft",
+        priority: 1,
+        weight: 100,
+        type,
+        config: targetConfig,
+        caps: config.caps,
+        schedule: config.schedule,
+        usageCount: 0,
+        errorRate: 0
+      }]
+    };
+  }
+
+  return config;
+}
 
 const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => (
   <label className="block text-xs font-bold text-slate-500 uppercase">

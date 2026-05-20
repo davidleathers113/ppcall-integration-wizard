@@ -13,6 +13,7 @@ import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { calculateFreshnessStatus } from "../../utils/freshness";
 import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
 import type { IntegrationDirection } from "../../models/appTypes";
 
 interface CampaignDetailProps {
@@ -23,6 +24,7 @@ interface CampaignDetailProps {
 
 const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack, onCreateIntegration }) => {
   const { state } = useAppContext();
+  const actions = useAppActions();
   const [activeTab, setActiveTab] = useState("overview");
 
   const campaign = state.campaigns.find(c => c.id === campaignId);
@@ -87,6 +89,33 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack, onC
       case "buyers": {
         const list = activeTab === "publishers" ? publishers : buyers;
         const direction: IntegrationDirection = activeTab === "publishers" ? "publisher" : "buyer";
+        const addSource = (integrationId: string) => {
+          const integration = integrations.find(item => item.id === integrationId);
+          if (!integration) return;
+          const next = (integration.config.publisherSources?.length || 0) + 1;
+          actions.createPublisherSource(integrationId, {
+            name: `New Source ${next}`,
+            publisherId: integration.config.publisherId || `pub_${integration.id}`,
+            sourceId: `source_${next}`,
+            subAffiliateId: `sub_${next}`,
+            requiredFields: integration.config.requiredFields || ["caller_id", "zip"],
+            postingUrl: integration.config.postingUrl || `https://mock-ppcall.local/rtb/${campaignId}/${integration.id}/source_${next}`,
+            caps: { daily: 100 }
+          });
+        };
+        const addTarget = (integrationId: string) => {
+          const integration = integrations.find(item => item.id === integrationId);
+          if (!integration) return;
+          const next = (integration.config.buyerTargets?.length || 0) + 1;
+          actions.createBuyerTarget(integrationId, {
+            name: `New Target ${next}`,
+            priority: next,
+            weight: 100,
+            type: integration.type,
+            config: integration.config,
+            caps: { daily: 100 }
+          });
+        };
         return (
           <div className="space-y-4">
             <div className="flex justify-end">
@@ -98,28 +127,80 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack, onC
                 Add {direction === "publisher" ? "Publisher" : "Buyer"}
               </button>
             </div>
-            <Card className="p-0">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {list.map(int => (
-                    <tr key={int.id}>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-slate-900">{int.name}</p>
-                        <p className="text-[10px] text-slate-400">{int.type.toUpperCase()}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <Badge variant={calculateFreshnessStatus(int)}>{calculateFreshnessStatus(int)}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <Card className="p-0 overflow-hidden">
+              {list.map(int => (
+                <div key={int.id} className="border-b border-slate-100 last:border-b-0">
+                  <div className="px-6 py-4 bg-slate-50 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{int.name}</p>
+                      <p className="text-[10px] text-slate-400">{int.type.toUpperCase()} relationship • {int.id}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={calculateFreshnessStatus(int)}>{calculateFreshnessStatus(int)}</Badge>
+                      <button
+                        onClick={() => direction === "publisher" ? addSource(int.id) : addTarget(int.id)}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                      >
+                        Add {direction === "publisher" ? "Source" : "Target"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {direction === "publisher" ? (
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-white border-b border-slate-100">
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Source / Subaffiliate</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Required Fields</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Caps</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Usage</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(int.config.publisherSources || []).map(source => (
+                          <tr key={source.id}>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-medium text-slate-900">{source.name}</p>
+                              <p className="text-[10px] text-slate-400">{source.publisherId} • {source.subAffiliateId || source.sourceId || source.id}</p>
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-500">{source.requiredFields.join(", ")}</td>
+                            <td className="px-6 py-4 text-xs text-slate-500">{source.caps?.daily ? `${source.caps.daily}/day` : "None"}</td>
+                            <td className="px-6 py-4 text-xs text-slate-500">{source.usageCount.toLocaleString()} calls • {(source.errorRate * 100).toFixed(1)}% err</td>
+                            <td className="px-6 py-4"><Badge variant={source.status}>{source.status}</Badge></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="bg-white border-b border-slate-100">
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Target</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Routing</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Destination</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Usage</th>
+                          <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(int.config.buyerTargets || []).map(target => (
+                          <tr key={target.id}>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-medium text-slate-900">{target.name}</p>
+                              <p className="text-[10px] text-slate-400">{target.type.toUpperCase()} • {target.id}</p>
+                            </td>
+                            <td className="px-6 py-4 text-xs text-slate-500">Priority {target.priority} • Weight {target.weight}</td>
+                            <td className="px-6 py-4 text-xs text-slate-500">{target.config.url || target.config.destinationNumber || target.config.sipAddress || "Not configured"}</td>
+                            <td className="px-6 py-4 text-xs text-slate-500">{target.usageCount.toLocaleString()} calls • {(target.errorRate * 100).toFixed(1)}% err</td>
+                            <td className="px-6 py-4"><Badge variant={target.status}>{target.status}</Badge></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              ))}
               {list.length === 0 && (
                 <div className="p-8 text-center text-sm text-slate-500">
                   No {activeTab} yet. Add one to start configuring this campaign.
