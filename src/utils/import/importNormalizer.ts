@@ -1,4 +1,10 @@
-import type { IntegrationConfig, IntegrationStatus } from "../../models/appTypes";
+import type {
+  BuyerDestinationKind,
+  CapOnMode,
+  IntegrationConfig,
+  IntegrationStatus,
+  ShareableTagsConfig,
+} from "../../models/appTypes";
 import { PRESETS } from "../../data/mockData";
 import type { ColumnMapping, ImportFieldKey, ImportIssue, NewIntegrationImportInput, ParsedImportRow } from "./importSchema";
 
@@ -31,7 +37,9 @@ export function normalizeImportRow(row: ParsedImportRow, mappings: ColumnMapping
 
   assignString(config, "method", method === "GET" || method === "POST" ? method : undefined);
   assignString(config, "url", values.url);
-  assignString(config, "destinationNumber", values.destination_number);
+  // Direct target "number" alias takes precedence if provided.
+  const numberValue = values.number || values.destination_number;
+  assignString(config, "destinationNumber", numberValue);
   assignString(config, "sipAddress", values.sip_address);
   assignString(config, "postingUrl", values.posting_url);
   assignString(config, "publisherId", values.publisher_id);
@@ -61,14 +69,151 @@ export function normalizeImportRow(row: ParsedImportRow, mappings: ColumnMapping
 
   const daily = parseOptionalNumber(values.daily_cap, errors, "daily_cap", true);
   const hourly = parseOptionalNumber(values.hourly_cap, errors, "hourly_cap", true);
-  if (daily !== undefined || hourly !== undefined) config.caps = { daily, hourly };
+  const global = parseOptionalNumber(values.global_cap, errors, "global_cap", true);
+  const monthly = parseOptionalNumber(values.monthly_cap, errors, "monthly_cap", true);
+  const concurrency = parseOptionalNumber(values.concurrency_cap, errors, "concurrency_cap", true);
+  if (
+    daily !== undefined ||
+    hourly !== undefined ||
+    global !== undefined ||
+    monthly !== undefined ||
+    concurrency !== undefined ||
+    values.cap_on
+  ) {
+    const capOn: CapOnMode | undefined =
+      values.cap_on === "connected_calls" ||
+      values.cap_on === "converted_calls" ||
+      values.cap_on === "revenue"
+        ? values.cap_on
+        : undefined;
+    config.caps = {
+      daily,
+      hourly,
+      global,
+      monthly,
+      concurrency,
+      capOn,
+    };
+  }
   const scheduleDays = parseList(values.schedule_days);
-  if (values.schedule_timezone || scheduleDays.length || values.schedule_start_time || values.schedule_end_time) {
+  if (
+    values.schedule_timezone ||
+    scheduleDays.length ||
+    values.schedule_start_time ||
+    values.schedule_end_time ||
+    values.schedule_mode
+  ) {
+    const mode =
+      values.schedule_mode === "always_open" ||
+      values.schedule_mode === "basic" ||
+      values.schedule_mode === "advanced"
+        ? values.schedule_mode
+        : "basic";
     config.schedule = {
       timezone: values.schedule_timezone || "America/New_York",
       days: scheduleDays.length ? scheduleDays : ["Mon", "Tue", "Wed", "Thu", "Fri"],
       startTime: values.schedule_start_time || "09:00",
-      endTime: values.schedule_end_time || "17:00"
+      endTime: values.schedule_end_time || "17:00",
+      mode,
+    };
+  }
+
+  // Direct target fields
+  const kind = normalizeBuyerDestinationKind(values.buyer_destination_kind, values.target_mode, type);
+  if (kind) config.buyerDestinationKind = kind;
+
+  parseJsonRecord(values.sip_headers_json, "sip_headers_json", errors, sipHeaders => {
+    const headers = stringifyRecord(sipHeaders);
+    config.destination = { ...(config.destination || {}), sipHeaders: headers };
+  });
+
+  if (kind === "direct_number") {
+    config.destinationMode = "static_number";
+    const number = numberValue;
+    if (number) {
+      config.destination = { ...(config.destination || {}), number };
+    } else {
+      errors.push(issue("number", "missing_destination", "Direct Number Target requires a destination number."));
+    }
+  } else if (kind === "direct_sip") {
+    config.destinationMode = "static_sip";
+    if (values.sip_address) {
+      config.destination = { ...(config.destination || {}), sipAddress: values.sip_address };
+    } else {
+      errors.push(issue("sip_address", "missing_sip", "Direct SIP Target requires a SIP address."));
+    }
+  }
+
+  const connectionTimeout = parseOptionalNumber(
+    values.connection_timeout_seconds,
+    errors,
+    "connection_timeout_seconds",
+    true
+  );
+  const revenueRecovery = normalizeRevenueRecovery(values.revenue_recovery);
+  if (connectionTimeout !== undefined || revenueRecovery !== undefined) {
+    config.callHandling = {
+      connectionTimeoutSeconds: connectionTimeout,
+      revenueRecovery,
+    };
+  }
+
+  if (values.dial_ivr_enabled || values.dial_ivr_digits) {
+    config.dialIvr = {
+      enabled: parseBoolean(values.dial_ivr_enabled),
+      digits: values.dial_ivr_digits || undefined,
+    };
+  }
+
+  if (values.recordings) {
+    if (["account_default", "enabled", "disabled"].includes(values.recordings)) {
+      config.recordingSettings = { mode: values.recordings as "account_default" | "enabled" | "disabled" };
+    } else {
+      warnings.push(issue("recordings", "invalid_recordings", `Unknown recordings value '${values.recordings}'.`));
+    }
+  }
+
+  if (values.duplicate_mode) {
+    if (
+      ["campaign_default", "buyer_default", "do_not_restrict", "restrict"].includes(values.duplicate_mode)
+    ) {
+      const duplicateWindow = parseOptionalNumber(
+        values.duplicate_window_minutes,
+        errors,
+        "duplicate_window_minutes",
+        true
+      );
+      config.duplicateRules = {
+        mode: values.duplicate_mode as "campaign_default" | "buyer_default" | "do_not_restrict" | "restrict",
+        windowMinutes: duplicateWindow,
+      };
+      if (config.duplicateRules.mode === "restrict" && duplicateWindow === undefined) {
+        errors.push(issue("duplicate_window_minutes", "missing_window", "Restrict duplicates requires a window."));
+      }
+    } else {
+      warnings.push(issue("duplicate_mode", "invalid_duplicate_mode", `Unknown duplicate_mode '${values.duplicate_mode}'.`));
+    }
+  }
+
+  if (values.shareable_tags_mode || values.shareable_tags || values.share_inbound_call_id) {
+    const shareableTagsMode: ShareableTagsConfig["mode"] =
+      values.shareable_tags_mode === "buyer_default" ||
+      values.shareable_tags_mode === "campaign_default" ||
+      values.shareable_tags_mode === "override"
+        ? values.shareable_tags_mode
+        : "buyer_default";
+    config.shareableTags = {
+      mode: shareableTagsMode,
+      shareInboundCallId: parseBoolean(values.share_inbound_call_id),
+      tags: parseList(values.shareable_tags),
+    };
+  }
+
+  if (values.predictive_routing_mode || values.priority_bump) {
+    config.predictiveRouting = {
+      mode:
+        values.predictive_routing_mode === "estimated_revenue" ? "estimated_revenue" : "campaign_default",
+      priorityBump: parseOptionalNumber(values.priority_bump, errors, "priority_bump", true) ?? 0,
     };
   }
 
@@ -86,6 +231,38 @@ export function normalizeImportRow(row: ParsedImportRow, mappings: ColumnMapping
       config
     }
   };
+}
+
+function normalizeBuyerDestinationKind(
+  value: string | undefined,
+  targetMode: string | undefined,
+  type: string | undefined
+): BuyerDestinationKind | undefined {
+  if (value) {
+    if (
+      value === "direct_number" ||
+      value === "direct_sip" ||
+      value === "rtb" ||
+      value === "webhook" ||
+      value === "generic_api"
+    ) {
+      return value;
+    }
+  }
+  if (targetMode === "number" && type === "static_number") return "direct_number";
+  if (targetMode === "sip" && type === "sip") return "direct_sip";
+  return undefined;
+}
+
+function normalizeRevenueRecovery(value: string | undefined): "buyer_default" | "enabled" | "disabled" | undefined {
+  if (value === "buyer_default" || value === "enabled" || value === "disabled") return value;
+  return undefined;
+}
+
+function parseBoolean(value: string | undefined): boolean {
+  if (!value) return false;
+  const lowered = value.trim().toLowerCase();
+  return lowered === "true" || lowered === "yes" || lowered === "1";
 }
 
 function mappedValues(row: ParsedImportRow, mappings: ColumnMapping[]): Partial<Record<ImportFieldKey, string>> {
@@ -148,7 +325,20 @@ function parseAcceptedValue(value: string | undefined): string | boolean | numbe
 }
 
 export function parseList(value: string | undefined): string[] {
-  return value ? value.split(/[,;|]/).map(item => item.trim()).filter(Boolean) : [];
+  if (!value) return [];
+  // Split on comma, semicolon, or pipe — using string methods (no regex).
+  const tokens: string[] = [];
+  let current = "";
+  for (const ch of value) {
+    if (ch === "," || ch === ";" || ch === "|") {
+      tokens.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  tokens.push(current);
+  return tokens.map(item => item.trim()).filter(Boolean);
 }
 
 function issue(field: string, code: string, message: string, fix?: string): ImportIssue {

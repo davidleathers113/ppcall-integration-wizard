@@ -37,7 +37,28 @@ export type ImportFieldKey =
   | "schedule_timezone"
   | "schedule_days"
   | "schedule_start_time"
-  | "schedule_end_time";
+  | "schedule_end_time"
+  | "buyer_destination_kind"
+  | "target_mode"
+  | "number"
+  | "sip_headers_json"
+  | "connection_timeout_seconds"
+  | "dial_ivr_enabled"
+  | "dial_ivr_digits"
+  | "recordings"
+  | "revenue_recovery"
+  | "schedule_mode"
+  | "cap_on"
+  | "global_cap"
+  | "monthly_cap"
+  | "concurrency_cap"
+  | "duplicate_mode"
+  | "duplicate_window_minutes"
+  | "shareable_tags_mode"
+  | "share_inbound_call_id"
+  | "shareable_tags"
+  | "predictive_routing_mode"
+  | "priority_bump";
 
 export interface ParsedImportRow {
   rowNumber: number;
@@ -131,12 +152,33 @@ export const IMPORT_FIELDS: Record<ImportFieldKey, { label: string; required?: b
   conversion_duration_path: { label: "Conversion Duration Path", aliases: [] },
   expires_in_seconds_path: { label: "Expires Seconds Path", aliases: ["expiration_path"] },
   reject_reason_path: { label: "Reject Reason Path", aliases: ["reject_path", "reason_path"] },
-  daily_cap: { label: "Daily Cap", aliases: ["daily"] },
+  daily_cap: { label: "Daily Cap", aliases: ["daily", "daily_call_cap"] },
   hourly_cap: { label: "Hourly Cap", aliases: ["hourly"] },
-  schedule_timezone: { label: "Schedule Timezone", aliases: ["timezone"] },
+  schedule_timezone: { label: "Schedule Timezone", aliases: ["timezone", "time_zone", "tz"] },
   schedule_days: { label: "Schedule Days", aliases: ["days"] },
   schedule_start_time: { label: "Schedule Start Time", aliases: ["start_time"] },
   schedule_end_time: { label: "Schedule End Time", aliases: ["end_time"] },
+  buyer_destination_kind: { label: "Buyer Destination Kind", aliases: ["destination_kind"] },
+  target_mode: { label: "Target Mode", aliases: [] },
+  number: { label: "Number", aliases: ["phone", "phone_number", "destination_number", "transfer_number"] },
+  sip_headers_json: { label: "SIP Headers JSON", aliases: ["sip_headers"] },
+  connection_timeout_seconds: { label: "Connection Timeout Seconds", aliases: ["timeout", "connection_timeout", "connection_timeout_sec"] },
+  dial_ivr_enabled: { label: "Dial IVR Enabled", aliases: ["dial_ivr"] },
+  dial_ivr_digits: { label: "Dial IVR Digits", aliases: ["ivr_digits"] },
+  recordings: { label: "Recordings", aliases: ["recording_mode"] },
+  revenue_recovery: { label: "Revenue Recovery", aliases: [] },
+  schedule_mode: { label: "Schedule Mode", aliases: [] },
+  cap_on: { label: "Cap On", aliases: [] },
+  global_cap: { label: "Global Cap", aliases: ["global"] },
+  monthly_cap: { label: "Monthly Cap", aliases: ["monthly"] },
+  concurrency_cap: { label: "Concurrency Cap", aliases: ["max_concurrency", "concurrency"] },
+  duplicate_mode: { label: "Duplicate Mode", aliases: ["duplicate_rule_mode"] },
+  duplicate_window_minutes: { label: "Duplicate Window Minutes", aliases: ["duplicate_window"] },
+  shareable_tags_mode: { label: "Shareable Tags Mode", aliases: [] },
+  share_inbound_call_id: { label: "Share Inbound Call ID", aliases: [] },
+  shareable_tags: { label: "Shareable Tags", aliases: [] },
+  predictive_routing_mode: { label: "Predictive Routing Mode", aliases: [] },
+  priority_bump: { label: "Priority Bump", aliases: [] },
 };
 
 export const IMPORT_FIELD_KEYS = Object.keys(IMPORT_FIELDS) as ImportFieldKey[];

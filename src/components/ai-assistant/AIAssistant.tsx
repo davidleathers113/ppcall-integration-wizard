@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { AlertTriangle, Bot, CheckCircle, FileCode, Sparkles, Wand2 } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
-import type { IntegrationConfig, IntegrationDirection, IntegrationType } from "../../models/appTypes";
+import type { IntegrationConfig, IntegrationDirection, IntegrationSchedule, IntegrationType } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
 import { useToast } from "../shared/ToastProvider";
@@ -175,8 +175,26 @@ function buildProposal(instructions: string): AIConfigProposal {
   // Extract URL using string methods instead of regex
   const url = extractUrl(instructions);
 
+  // Direct target detection — SIP first because "sip:" implies direct SIP.
+  const sipAddress = extractSipAddress(instructions);
+  const phoneNumber = extractPhoneNumber(instructions);
+  const wantsDirectSip = Boolean(sipAddress) || lower.includes("route to sip") || lower.includes("direct sip");
+  const wantsDirectNumber =
+    !wantsDirectSip &&
+    Boolean(phoneNumber) &&
+    (lower.includes("send calls to") ||
+      lower.includes("route calls to") ||
+      lower.includes("direct number") ||
+      (Boolean(phoneNumber) && !url));
+
   const direction: IntegrationDirection = lower.includes("publisher") || lower.includes("supplier") || lower.includes("post traffic") ? "publisher" : "buyer";
-  const type: IntegrationType = lower.includes("sip") ? "sip" : lower.includes("static") || lower.includes("direct number") ? "static_number" : lower.includes("webhook") ? "webhook" : "rtb";
+  const type: IntegrationType = wantsDirectSip || lower.includes("sip")
+    ? "sip"
+    : wantsDirectNumber || lower.includes("static") || lower.includes("direct number")
+    ? "static_number"
+    : lower.includes("webhook")
+    ? "webhook"
+    : "rtb";
   const method = lower.includes("get") && !lower.includes("post") ? "GET" : "POST";
   const requiredFields = Object.entries(fieldSynonyms).filter(([, aliases]) => aliases.some(alias => lower.includes(alias))).map(([field]) => field);
   const acceptedField = firstMatch(lower, ["accepted", "success", "status", "code"]) || "accepted";
@@ -217,6 +235,80 @@ function buildProposal(instructions: string): AIConfigProposal {
         acceptedResponse: { accepted: true, phone_number: "+18005551212", payout: 35, expires_in_seconds: expiresInSeconds },
         rejectedResponse: { accepted: false, reason: "no_buyer_available" }
       }
+    };
+  }
+
+  if (direction === "buyer" && wantsDirectNumber) {
+    const payout = extractCurrencyAmount(instructions) ?? 35;
+    const conversionDuration = extractAfterSeconds(instructions) ?? 120;
+    const dailyCap = extractDailyCap(instructions);
+    const concurrency = extractMaxConcurrency(instructions);
+    const schedule = extractScheduleHints(instructions);
+    const config: IntegrationConfig = {
+      buyerDestinationKind: "direct_number",
+      destinationMode: "static_number",
+      destination: { number: phoneNumber || "+18005551212" },
+      destinationNumber: phoneNumber || "+18005551212",
+      payout,
+      conversionDurationSeconds: conversionDuration,
+      callHandling: { connectionTimeoutSeconds: 30, revenueRecovery: "buyer_default" },
+      schedule: schedule || {
+        timezone: "America/New_York",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        startTime: "00:00",
+        endTime: "23:59",
+        mode: "always_open",
+      },
+      caps: {
+        capOn: "converted_calls",
+        daily: dailyCap,
+        concurrency,
+      },
+    };
+    return {
+      direction: "buyer",
+      type: "static_number",
+      platformPreset: "ai_detected_direct_number",
+      confidence: 86,
+      warnings,
+      config,
+    };
+  }
+
+  if (direction === "buyer" && wantsDirectSip) {
+    const payout = extractCurrencyAmount(instructions) ?? 35;
+    const conversionDuration = extractAfterSeconds(instructions) ?? 120;
+    const dailyCap = extractDailyCap(instructions);
+    const concurrency = extractMaxConcurrency(instructions);
+    const schedule = extractScheduleHints(instructions);
+    const config: IntegrationConfig = {
+      buyerDestinationKind: "direct_sip",
+      destinationMode: "static_sip",
+      destination: { sipAddress: sipAddress || "sip:buyer@example.com" },
+      sipAddress: sipAddress || "sip:buyer@example.com",
+      payout,
+      conversionDurationSeconds: conversionDuration,
+      callHandling: { connectionTimeoutSeconds: 30, revenueRecovery: "buyer_default" },
+      schedule: schedule || {
+        timezone: "America/New_York",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        startTime: "00:00",
+        endTime: "23:59",
+        mode: "always_open",
+      },
+      caps: {
+        capOn: "converted_calls",
+        daily: dailyCap,
+        concurrency,
+      },
+    };
+    return {
+      direction: "buyer",
+      type: "sip",
+      platformPreset: "ai_detected_direct_sip",
+      confidence: 86,
+      warnings,
+      config,
     };
   }
 
@@ -374,6 +466,209 @@ function extractExpirationSeconds(text: string): number {
   }
 
   return 0;
+}
+
+function extractPhoneNumber(text: string): string | undefined {
+  // Look for E.164-style "+1..." or "+44..." patterns using string scan.
+  const plusIndex = text.indexOf("+");
+  if (plusIndex === -1) return undefined;
+  // Confirm at least one digit follows.
+  let cursor = plusIndex + 1;
+  if (cursor >= text.length) return undefined;
+  if (!isDigitChar(text[cursor])) return undefined;
+  let result = "+";
+  while (cursor < text.length) {
+    const ch = text[cursor];
+    if (isDigitChar(ch)) {
+      result += ch;
+    } else if (ch === " " || ch === "-" || ch === "(" || ch === ")" || ch === "." || ch === " ") {
+      // Allow separators between digits but don't include them.
+    } else {
+      break;
+    }
+    cursor++;
+  }
+  // Need 8-15 digits.
+  const digits = result.length - 1;
+  if (digits < 8 || digits > 15) return undefined;
+  return result;
+}
+
+function extractSipAddress(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf("sip:");
+  const idxs = lower.indexOf("sips:");
+  let start = -1;
+  let scheme = "";
+  if (idx !== -1 && (idxs === -1 || idx < idxs)) {
+    start = idx;
+    scheme = "sip:";
+  } else if (idxs !== -1) {
+    start = idxs;
+    scheme = "sips:";
+  }
+  if (start === -1) return undefined;
+  let cursor = start + scheme.length;
+  let result = text.substring(start, start + scheme.length);
+  while (cursor < text.length) {
+    const ch = text[cursor];
+    if (ch === " " || ch === "," || ch === ";" || ch === "\n" || ch === "\t" || ch === '"' || ch === "'" || ch === ")") {
+      break;
+    }
+    result += ch;
+    cursor++;
+  }
+  if (result === scheme) return undefined;
+  return result;
+}
+
+function extractCurrencyAmount(text: string): number | undefined {
+  // Look for "$NN" or "NN dollars" or "pays NN".
+  const dollarIdx = text.indexOf("$");
+  if (dollarIdx !== -1) {
+    let cursor = dollarIdx + 1;
+    let numStr = "";
+    while (cursor < text.length) {
+      const ch = text[cursor];
+      if (isDigitChar(ch) || ch === ".") {
+        numStr += ch;
+      } else {
+        break;
+      }
+      cursor++;
+    }
+    if (numStr.length > 0) {
+      const num = Number(numStr);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+  }
+  return extractKeywordNumber(text, ["pays ", "payout of ", "payout is ", "payout "]);
+}
+
+function extractAfterSeconds(text: string): number | undefined {
+  // Look for "after NN seconds" patterns.
+  return (
+    extractKeywordNumber(text, ["after "]) ??
+    extractKeywordNumber(text, ["conversion duration ", "conversion duration of "])
+  );
+}
+
+function extractDailyCap(text: string): number | undefined {
+  return extractKeywordNumber(text, ["daily cap ", "daily cap is ", "daily cap of "]);
+}
+
+function extractMaxConcurrency(text: string): number | undefined {
+  return extractKeywordNumber(text, ["max concurrency ", "max concurrency of ", "concurrency "]);
+}
+
+function extractKeywordNumber(text: string, keywords: string[]): number | undefined {
+  const lower = text.toLowerCase();
+  for (const keyword of keywords) {
+    const idx = lower.indexOf(keyword);
+    if (idx === -1) continue;
+    let cursor = idx + keyword.length;
+    // Skip optional leading whitespace.
+    while (cursor < text.length && text[cursor] === " ") cursor++;
+    let numStr = "";
+    while (cursor < text.length) {
+      const ch = text[cursor];
+      if (isDigitChar(ch) || ch === ".") numStr += ch;
+      else if (numStr.length > 0) break;
+      else break;
+      cursor++;
+    }
+    if (numStr.length > 0) {
+      const num = Number(numStr);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+  }
+  return undefined;
+}
+
+function extractScheduleHints(text: string): IntegrationSchedule | undefined {
+  const lower = text.toLowerCase();
+  // Default timezone.
+  let timezone = "America/New_York";
+  if (lower.includes("eastern")) timezone = "America/New_York";
+  else if (lower.includes("central")) timezone = "America/Chicago";
+  else if (lower.includes("mountain")) timezone = "America/Denver";
+  else if (lower.includes("pacific")) timezone = "America/Los_Angeles";
+  else if (lower.includes("utc")) timezone = "UTC";
+
+  const days: string[] = [];
+  if (lower.includes("monday through friday") || lower.includes("monday to friday") || lower.includes("mon-fri") || lower.includes("weekdays")) {
+    days.push("Mon", "Tue", "Wed", "Thu", "Fri");
+  }
+  if (lower.includes("saturday")) days.push("Sat");
+  if (lower.includes("sunday")) days.push("Sun");
+
+  // Hours like "8am to 6pm".
+  const startTime = extractTime(text, ["from ", "open "]) ?? extractTime(text, [" "]);
+  const endTime = extractEndTime(text);
+
+  if (!days.length && !startTime && !endTime && !lower.includes("eastern") && !lower.includes("hours")) {
+    return undefined;
+  }
+
+  return {
+    timezone,
+    days: days.length ? days : ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    startTime: startTime || "09:00",
+    endTime: endTime || "17:00",
+    mode: days.length || startTime || endTime ? "basic" : "always_open",
+  };
+}
+
+function extractTime(text: string, _prefixes: string[]): string | undefined {
+  const lower = text.toLowerCase();
+  // Find first "am" or "pm" occurrence and walk back to find the hour digits.
+  const ampm = ["am", "pm"];
+  for (const marker of ampm) {
+    const idx = lower.indexOf(marker);
+    if (idx === -1) continue;
+    // Walk back over optional whitespace.
+    let cursor = idx - 1;
+    while (cursor >= 0 && text[cursor] === " ") cursor--;
+    // Read digits backward.
+    let digitsEnd = cursor + 1;
+    while (cursor >= 0 && (isDigitChar(text[cursor]) || text[cursor] === ":")) cursor--;
+    const numStr = text.substring(cursor + 1, digitsEnd);
+    if (numStr.length === 0) continue;
+    const formatted = formatHourString(numStr, marker as "am" | "pm");
+    if (formatted) return formatted;
+  }
+  return undefined;
+}
+
+function extractEndTime(text: string): string | undefined {
+  const lower = text.toLowerCase();
+  const toIdx = lower.indexOf(" to ");
+  if (toIdx === -1) return undefined;
+  // Look for time after " to ".
+  const subText = text.substring(toIdx + 4);
+  return extractTime(subText, []);
+}
+
+function formatHourString(numStr: string, ampm: "am" | "pm"): string | undefined {
+  const colonIdx = numStr.indexOf(":");
+  let hour: number;
+  let minute = 0;
+  if (colonIdx === -1) {
+    hour = Number(numStr);
+  } else {
+    hour = Number(numStr.substring(0, colonIdx));
+    minute = Number(numStr.substring(colonIdx + 1)) || 0;
+  }
+  if (!Number.isFinite(hour) || hour < 0 || hour > 12) return undefined;
+  if (ampm === "pm" && hour < 12) hour += 12;
+  if (ampm === "am" && hour === 12) hour = 0;
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function isDigitChar(ch: string): boolean {
+  return ch >= "0" && ch <= "9";
 }
 
 export default AIAssistant;

@@ -3,13 +3,18 @@ import { resolveObjectTokens, DEFAULT_TOKENS } from "./tokenResolver";
 import { extractJsonPath } from "./jsonPath";
 import { createId } from "./id";
 import {
+  inferBuyerDestinationKind,
+  inferCallHandling,
+  inferCapUsage,
   inferDestination,
   inferDestinationMode,
   inferDialIvr,
   inferDuplicateRules,
   inferRecordingSettings,
   inferRevenueSettings,
+  isDirectTargetKind,
 } from "./buyerConfigDefaults";
+import { validatePhoneNumber, validateSipAddress } from "./targetValidation";
 
 export function simulateIntegrationTest(integration: Integration, inputTokens: Record<string, string> = DEFAULT_TOKENS): TestRun {
   const isBuyer = integration.direction === "buyer";
@@ -39,8 +44,92 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
   let parsedResult: Record<string, unknown> = {};
 
   // 1. Basic configuration checks
+  const buyerKind = isBuyer ? inferBuyerDestinationKind(integration) : "generic_api";
+  const isDirect = isBuyer && isDirectTargetKind(buyerKind);
   if (isBuyer) {
-    if (integration.type !== "static_number" && integration.type !== "sip") {
+    if (isDirect) {
+      // Direct target checks — no HTTP request fields are required.
+      const destinationValue =
+        buyerKind === "direct_number"
+          ? config.destination?.number ?? config.destinationNumber
+          : config.destination?.sipAddress ?? config.sipAddress;
+
+      if (buyerKind === "direct_number") {
+        checklist.push({
+          label: "Destination number present",
+          status: destinationValue ? "pass" : "fail",
+          message: destinationValue
+            ? "Destination number configured."
+            : "Destination number is missing."
+        });
+        if (destinationValue) {
+          const result = validatePhoneNumber(destinationValue);
+          checklist.push({
+            label: "Destination number format valid",
+            status: result.valid ? "pass" : "fail",
+            message: result.valid
+              ? "Destination number is valid E.164."
+              : result.message || "Destination number format is invalid."
+          });
+        }
+      } else {
+        checklist.push({
+          label: "SIP address present",
+          status: destinationValue ? "pass" : "fail",
+          message: destinationValue ? "SIP address configured." : "SIP address is missing."
+        });
+        if (destinationValue) {
+          const result = validateSipAddress(destinationValue);
+          checklist.push({
+            label: "SIP address format valid",
+            status: result.valid ? "pass" : "fail",
+            message: result.valid
+              ? "SIP address is well-formed."
+              : result.message || "SIP address format is invalid."
+          });
+        }
+        if (
+          !config.destination?.sipHeaders ||
+          Object.keys(config.destination.sipHeaders).length === 0
+        ) {
+          checklist.push({
+            label: "SIP headers configured",
+            status: "warning",
+            message: "No custom SIP headers configured. Some buyers require specific X-headers."
+          });
+        }
+      }
+
+      const callHandling = inferCallHandling(config);
+      checklist.push({
+        label: "Connection timeout configured",
+        status: callHandling.connectionTimeoutSeconds && callHandling.connectionTimeoutSeconds > 0 ? "pass" : "warning",
+        message:
+          callHandling.connectionTimeoutSeconds && callHandling.connectionTimeoutSeconds > 0
+            ? `Connection timeout set to ${callHandling.connectionTimeoutSeconds}s.`
+            : "No connection timeout configured; default will be used."
+      });
+      if (callHandling.revenueRecovery === "disabled") {
+        checklist.push({
+          label: "Revenue recovery",
+          status: "warning",
+          message: "Revenue recovery is disabled. Failed transfers will not be retried."
+        });
+      }
+
+      checklist.push({
+        label: "Payout configured",
+        status: config.payout !== undefined ? "pass" : "fail",
+        message: config.payout !== undefined ? "Payout configured." : "Payout is missing."
+      });
+      checklist.push({
+        label: "Conversion duration configured",
+        status: config.conversionDurationSeconds ? "pass" : "fail",
+        message: config.conversionDurationSeconds
+          ? "Conversion duration configured."
+          : "Conversion duration is missing."
+      });
+    } else if (integration.type !== "static_number" && integration.type !== "sip") {
       checklist.push({
         label: "Endpoint URL present",
         status: config.url ? "pass" : "fail",
@@ -51,7 +140,7 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
         status: config.method ? "pass" : "fail",
         message: config.method ? `Method set to ${config.method}.` : "HTTP Method is missing."
       });
-      
+
       const timeout = config.timeoutSeconds || 3;
       if (timeout > 5) {
         checklist.push({
@@ -139,8 +228,8 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
     }
   }
 
-  // 2. Token mapping checks
-  if (isBuyer && (integration.type === "rtb" || integration.type === "generic_api")) {
+  // 2. Token mapping checks (skip for direct targets)
+  if (isBuyer && !isDirect && (integration.type === "rtb" || integration.type === "generic_api")) {
     const bodyStr = JSON.stringify(config.requestBody || {});
     const queryStr = JSON.stringify(config.queryParams || {});
     const hasCallerId = bodyStr.includes("caller_id") || queryStr.includes("caller_id");
@@ -157,8 +246,8 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
     });
   }
 
-  // 3. Response parsing checks
-  if (isBuyer && (integration.type === "rtb" || integration.type === "generic_api" || integration.type === "webhook")) {
+  // 3. Response parsing checks (skip for direct targets)
+  if (isBuyer && !isDirect && (integration.type === "rtb" || integration.type === "generic_api" || integration.type === "webhook")) {
     if (!config.responseParsing) {
       checklist.push({
         label: "Response parsing configured",
@@ -281,6 +370,35 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
           status: "warning",
           message: "No caps configured. Consider adding daily/hourly limits.",
         });
+      } else if (isDirect) {
+        if (config.caps.daily === undefined) {
+          checklist.push({
+            label: "Daily cap",
+            status: "warning",
+            message: "No daily cap configured for this direct target.",
+          });
+        }
+        if (config.caps.concurrency === undefined) {
+          checklist.push({
+            label: "Concurrency cap",
+            status: "warning",
+            message: "No concurrency cap configured for this direct target.",
+          });
+        }
+      }
+
+      // Concurrency usage vs cap.
+      const usage = inferCapUsage(config);
+      if (
+        config.caps.concurrency !== undefined &&
+        usage.currentConcurrency !== undefined &&
+        usage.currentConcurrency >= config.caps.concurrency
+      ) {
+        checklist.push({
+          label: "Concurrency available",
+          status: "fail",
+          message: "Current concurrency is at or above the cap; no new calls will route here.",
+        });
       }
     } else {
       checklist.push({
@@ -359,13 +477,21 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
     }
   }
 
-  const isTimeout = config.timeoutSeconds ? (responseTimeMs / 1000 > config.timeoutSeconds) : false;
-  
-  if (isTimeout) {
+  const httpTimeout = !isDirect && config.timeoutSeconds
+    ? (responseTimeMs / 1000 > config.timeoutSeconds)
+    : false;
+
+  if (httpTimeout) {
     checklist.push({
       label: "Response time",
       status: "fail",
       message: `Request timed out after ${responseTimeMs}ms.`
+    });
+  } else if (isDirect) {
+    checklist.push({
+      label: "Activation readiness",
+      status: "pass",
+      message: "Direct target checks complete. Activate when all required items pass."
     });
   } else {
     checklist.push({
@@ -378,16 +504,31 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
   const hasFailures = checklist.some(item => item.status === "fail");
   const status = hasFailures ? "failed" : "passed";
 
-  const requestPreview = isBuyer ? {
-    url: config.url || "N/A",
-    method: config.method || "N/A",
-    headers: config.headers || {},
-    body: resolveObjectTokens(config.requestBody || {}, inputTokens),
-    params: resolveObjectTokens(config.queryParams || {}, inputTokens)
-  } : {
-    type: integration.type,
-    expected_fields: config.requiredFields || []
-  };
+  const requestPreview = isBuyer
+    ? isDirect
+      ? {
+          buyer_destination_kind: buyerKind,
+          destination:
+            buyerKind === "direct_number"
+              ? config.destination?.number ?? config.destinationNumber ?? "N/A"
+              : config.destination?.sipAddress ?? config.sipAddress ?? "N/A",
+          sip_headers: buyerKind === "direct_sip" ? config.destination?.sipHeaders || {} : undefined,
+          connection_timeout_seconds: inferCallHandling(config).connectionTimeoutSeconds,
+          schedule: config.schedule,
+          caps: config.caps,
+          input_tokens: inputTokens,
+        }
+      : {
+          url: config.url || "N/A",
+          method: config.method || "N/A",
+          headers: config.headers || {},
+          body: resolveObjectTokens(config.requestBody || {}, inputTokens),
+          params: resolveObjectTokens(config.queryParams || {}, inputTokens),
+        }
+    : {
+        type: integration.type,
+        expected_fields: config.requiredFields || [],
+      };
 
   const finalRawResponse = status === "passed" ? rawResponse : {
     error: "Validation Error",

@@ -2,6 +2,9 @@ import React, { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type {
   AuthenticationMode,
+  BuyerDestinationKind,
+  CallHandlingConfig,
+  CapUsage,
   DestinationMode,
   DialIvrSettings,
   DuplicateRules,
@@ -12,34 +15,47 @@ import type {
   IntegrationCaps,
   IntegrationConfig,
   IntegrationSchedule,
+  PredictiveRoutingConfig,
   RecordingSettings,
   RequestConfig,
   RequestContentType,
   RevenueSettings,
+  ShareableTagsConfig,
 } from "../../models/appTypes";
 import { useAppActions } from "../../store/useAppActions";
 import {
   FILTER_FIELDS,
   TIMEZONE_OPTIONS,
   WEEKDAYS,
+  inferBuyerDestinationKind,
+  inferCallHandling,
+  inferCapUsage,
   inferDestination,
   inferDestinationMode,
   inferDialIvr,
   inferDuplicateRules,
   inferErrorSettings,
   inferFilters,
+  inferPredictiveRouting,
   inferRecordingSettings,
   inferRequest,
   inferRevenueSettings,
+  inferShareableTags,
+  isDirectTargetKind,
 } from "../../utils/buyerConfigDefaults";
 import TokenPicker from "../shared/TokenPicker";
 import { createId } from "../../utils/id";
+import {
+  validateDirectTargetConfig,
+  validatePhoneNumber,
+  validateSipAddress,
+} from "../../utils/targetValidation";
 
 interface BuyerConfigFormProps {
   integration: Integration;
 }
 
-const SECTION_TABS = [
+const RTB_SECTION_TABS = [
   { id: "destination", label: "Destination" },
   { id: "request", label: "Request" },
   { id: "response-parsing", label: "Response Parsing" },
@@ -49,11 +65,26 @@ const SECTION_TABS = [
   { id: "advanced", label: "Advanced Call Behavior" },
 ] as const;
 
-type SectionId = (typeof SECTION_TABS)[number]["id"];
+const DIRECT_SECTION_TABS = [
+  { id: "destination", label: "Destination" },
+  { id: "call-handling", label: "Call Handling" },
+  { id: "caps-schedule", label: "Caps & Schedule" },
+  { id: "duplicate-rules", label: "Duplicate Rules" },
+  { id: "revenue-recovery", label: "Revenue Recovery" },
+  { id: "shareable-tags", label: "Shareable Tags" },
+  { id: "predictive-routing", label: "Predictive Routing" },
+] as const;
+
+type SectionId =
+  | (typeof RTB_SECTION_TABS)[number]["id"]
+  | (typeof DIRECT_SECTION_TABS)[number]["id"];
 
 const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
   const actions = useAppActions();
   const config = integration.config;
+  const buyerKind = inferBuyerDestinationKind(integration);
+  const isDirect = isDirectTargetKind(buyerKind);
+  const sectionTabs = isDirect ? DIRECT_SECTION_TABS : RTB_SECTION_TABS;
   const [activeSection, setActiveSection] = useState<SectionId>("destination");
   const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
 
@@ -66,8 +97,18 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
   const errorSettings = inferErrorSettings(config);
   const filters = inferFilters(config);
   const dialIvr = inferDialIvr(config);
+  const callHandling = inferCallHandling(config);
+  const capUsage = inferCapUsage(config);
+  const shareableTags = inferShareableTags(config);
+  const predictiveRouting = inferPredictiveRouting(config);
 
   const validation = useMemo(() => {
+    if (isDirect) {
+      const issues = validateDirectTargetConfig(config, buyerKind);
+      return issues
+        .filter(item => item.severity === "error")
+        .map(item => item.message);
+    }
     const issues: string[] = [];
     if (destinationMode === "static_number" && !destination.number)
       issues.push("Static number destination requires a phone number.");
@@ -88,7 +129,7 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
       issues.push("Restrict duplicates mode requires a positive window in minutes.");
     if (!config.schedule?.timezone) issues.push("Timezone is required for the schedule.");
     return issues;
-  }, [config, destination, destinationMode, duplicateRules, request]);
+  }, [buyerKind, config, destination, destinationMode, duplicateRules, isDirect, request]);
 
   const update = (partial: Partial<IntegrationConfig>, message: string) => {
     actions.updateIntegration(
@@ -193,6 +234,22 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
     update({ dialIvr: next }, "Updated dial IVR settings.");
   };
 
+  const updateCallHandling = (next: CallHandlingConfig) => {
+    update({ callHandling: next }, "Updated call handling.");
+  };
+
+  const updateCapUsage = (next: CapUsage) => {
+    update({ capUsage: next }, "Updated cap usage.");
+  };
+
+  const updateShareableTags = (next: ShareableTagsConfig) => {
+    update({ shareableTags: next }, "Updated shareable tags.");
+  };
+
+  const updatePredictiveRouting = (next: PredictiveRoutingConfig) => {
+    update({ predictiveRouting: next }, "Updated predictive routing.");
+  };
+
   const applyJsonField = (key: "headers" | "queryParams" | "body", text: string) => {
     try {
       const parsed = JSON.parse(text) as unknown;
@@ -232,7 +289,7 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
       )}
 
       <div className="flex flex-wrap gap-1 border-b border-slate-200">
-        {SECTION_TABS.map(section => (
+        {sectionTabs.map(section => (
           <button
             key={section.id}
             type="button"
@@ -250,56 +307,118 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
       </div>
 
       <div className="pt-2">
-        {activeSection === "destination" && (
-          <DestinationSection
-            mode={destinationMode}
-            destination={destination}
-            onModeChange={updateDestinationMode}
-            onDestinationChange={updateDestination}
-          />
-        )}
-        {activeSection === "request" && (
-          <RequestSection
-            request={request}
-            jsonErrors={jsonErrors}
-            applyJsonField={applyJsonField}
-            onChange={updateRequest}
-          />
-        )}
-        {activeSection === "response-parsing" && (
-          <ResponseParsingSection
-            config={config}
-            updateResponseParsing={updateResponseParsing}
-          />
-        )}
-        {activeSection === "filters" && (
-          <FiltersSection filters={filters} updateFilters={updateFilters} />
-        )}
-        {activeSection === "caps-schedule" && (
-          <CapsScheduleSection
-            caps={config.caps || {}}
-            schedule={config.schedule}
-            updateCaps={updateCaps}
-            updateSchedule={updateSchedule}
-          />
-        )}
-        {activeSection === "revenue-errors" && (
-          <RevenueErrorsSection
-            revenue={revenue}
-            errorSettings={errorSettings}
-            updateRevenue={updateRevenue}
-            updateErrors={updateErrors}
-          />
-        )}
-        {activeSection === "advanced" && (
-          <AdvancedCallBehaviorSection
-            duplicateRules={duplicateRules}
-            recording={recording}
-            dialIvr={dialIvr}
-            updateDuplicateRules={updateDuplicateRules}
-            updateRecording={updateRecording}
-            updateDialIvr={updateDialIvr}
-          />
+        {isDirect ? (
+          <>
+            {activeSection === "destination" && (
+              <DirectDestinationSection
+                kind={buyerKind}
+                destination={destination}
+                onDestinationChange={updateDestination}
+              />
+            )}
+            {activeSection === "call-handling" && (
+              <CallHandlingSection
+                callHandling={callHandling}
+                dialIvr={dialIvr}
+                recording={recording}
+                updateCallHandling={updateCallHandling}
+                updateDialIvr={updateDialIvr}
+                updateRecording={updateRecording}
+              />
+            )}
+            {activeSection === "caps-schedule" && (
+              <CapsScheduleSection
+                caps={config.caps || {}}
+                schedule={config.schedule}
+                capUsage={capUsage}
+                updateCaps={updateCaps}
+                updateSchedule={updateSchedule}
+                updateCapUsage={updateCapUsage}
+              />
+            )}
+            {activeSection === "duplicate-rules" && (
+              <DuplicateRulesSection
+                duplicateRules={duplicateRules}
+                updateDuplicateRules={updateDuplicateRules}
+              />
+            )}
+            {activeSection === "revenue-recovery" && (
+              <RevenueRecoverySection
+                callHandling={callHandling}
+                revenue={revenue}
+                updateCallHandling={updateCallHandling}
+                updateRevenue={updateRevenue}
+              />
+            )}
+            {activeSection === "shareable-tags" && (
+              <ShareableTagsSection
+                shareableTags={shareableTags}
+                updateShareableTags={updateShareableTags}
+              />
+            )}
+            {activeSection === "predictive-routing" && (
+              <PredictiveRoutingSection
+                predictiveRouting={predictiveRouting}
+                updatePredictiveRouting={updatePredictiveRouting}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            {activeSection === "destination" && (
+              <DestinationSection
+                mode={destinationMode}
+                destination={destination}
+                onModeChange={updateDestinationMode}
+                onDestinationChange={updateDestination}
+              />
+            )}
+            {activeSection === "request" && (
+              <RequestSection
+                request={request}
+                jsonErrors={jsonErrors}
+                applyJsonField={applyJsonField}
+                onChange={updateRequest}
+              />
+            )}
+            {activeSection === "response-parsing" && (
+              <ResponseParsingSection
+                config={config}
+                updateResponseParsing={updateResponseParsing}
+              />
+            )}
+            {activeSection === "filters" && (
+              <FiltersSection filters={filters} updateFilters={updateFilters} />
+            )}
+            {activeSection === "caps-schedule" && (
+              <CapsScheduleSection
+                caps={config.caps || {}}
+                schedule={config.schedule}
+                capUsage={capUsage}
+                updateCaps={updateCaps}
+                updateSchedule={updateSchedule}
+                updateCapUsage={updateCapUsage}
+              />
+            )}
+            {activeSection === "revenue-errors" && (
+              <RevenueErrorsSection
+                revenue={revenue}
+                errorSettings={errorSettings}
+                updateRevenue={updateRevenue}
+                updateErrors={updateErrors}
+              />
+            )}
+            {activeSection === "advanced" && (
+              <AdvancedCallBehaviorSection
+                duplicateRules={duplicateRules}
+                recording={recording}
+                dialIvr={dialIvr}
+                updateDuplicateRules={updateDuplicateRules}
+                updateRecording={updateRecording}
+                updateDialIvr={updateDialIvr}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
@@ -715,9 +834,11 @@ const FiltersSection: React.FC<{
 const CapsScheduleSection: React.FC<{
   caps: IntegrationCaps;
   schedule?: IntegrationSchedule;
+  capUsage: CapUsage;
   updateCaps: (key: keyof IntegrationCaps, value: number | string | undefined) => void;
   updateSchedule: (partial: Partial<IntegrationSchedule>) => void;
-}> = ({ caps, schedule, updateCaps, updateSchedule }) => {
+  updateCapUsage: (next: CapUsage) => void;
+}> = ({ caps, schedule, capUsage, updateCaps, updateSchedule, updateCapUsage }) => {
   const days = schedule?.days || [];
   const toggleDay = (day: string) => {
     const next = days.includes(day) ? days.filter(item => item !== day) : [...days, day];
@@ -772,6 +893,31 @@ const CapsScheduleSection: React.FC<{
             onChange={value => updateCaps("concurrency", value || undefined)}
           />
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <NumberField
+            label="Daily Used"
+            testId="cap-usage-daily"
+            value={capUsage.dailyUsed ?? 0}
+            onChange={value => updateCapUsage({ ...capUsage, dailyUsed: value || undefined })}
+          />
+          <NumberField
+            label="Current Concurrency"
+            testId="cap-usage-concurrency"
+            value={capUsage.currentConcurrency ?? 0}
+            onChange={value => updateCapUsage({ ...capUsage, currentConcurrency: value || undefined })}
+          />
+        </div>
+        {(caps.daily !== undefined || caps.concurrency !== undefined) && (
+          <div data-testid="cap-usage-preview" className="text-[11px] text-slate-500 italic">
+            {caps.daily !== undefined && (
+              <span>{capUsage.dailyUsed ?? 0} / {caps.daily} daily</span>
+            )}
+            {caps.daily !== undefined && caps.concurrency !== undefined && <span> · </span>}
+            {caps.concurrency !== undefined && (
+              <span>{capUsage.currentConcurrency ?? 0} / {caps.concurrency} concurrent</span>
+            )}
+          </div>
+        )}
       </div>
       <div className="space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1012,6 +1158,357 @@ const AdvancedCallBehaviorSection: React.FC<{
     </div>
   </section>
 );
+
+// ===================== Direct target sections =====================
+
+const DirectDestinationSection: React.FC<{
+  kind: BuyerDestinationKind;
+  destination: { number?: string; sipAddress?: string; sipHeaders?: Record<string, string> };
+  onDestinationChange: (
+    key: "number" | "sipAddress" | "dynamicNumberPath" | "dynamicSipPath",
+    value: string
+  ) => void;
+}> = ({ kind, destination, onDestinationChange }) => {
+  const numberValue = destination.number || "";
+  const sipValue = destination.sipAddress || "";
+  const numberStatus = !numberValue
+    ? { tone: "empty", text: "Destination number is required." }
+    : validatePhoneNumber(numberValue).valid
+    ? { tone: "valid", text: "Looks valid." }
+    : { tone: "invalid", text: validatePhoneNumber(numberValue).message || "Invalid number." };
+  const sipStatus = !sipValue
+    ? { tone: "empty", text: "SIP address is required." }
+    : validateSipAddress(sipValue).valid
+    ? { tone: "valid", text: "Looks valid." }
+    : { tone: "invalid", text: validateSipAddress(sipValue).message || "Invalid SIP." };
+
+  return (
+    <section className="space-y-4">
+      <SectionHeader title="Destination" description="Direct destination for this buyer's calls." />
+      {kind === "direct_number" ? (
+        <div className="space-y-2">
+          <TextField
+            label="Destination Number"
+            testId="direct-target-number"
+            value={numberValue}
+            onChange={value => onDestinationChange("number", value)}
+            helper="Use country code format, such as +12223334444."
+          />
+          <p
+            data-testid="direct-target-number-status"
+            data-status={numberStatus.tone}
+            className={`text-[11px] italic ${
+              numberStatus.tone === "valid"
+                ? "text-green-600"
+                : numberStatus.tone === "invalid"
+                ? "text-red-600"
+                : "text-slate-500"
+            }`}
+          >
+            {numberStatus.text}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <TextField
+            label="SIP Address"
+            testId="direct-target-sip-address"
+            value={sipValue}
+            onChange={value => onDestinationChange("sipAddress", value)}
+            helper="Use a SIP URI such as sip:buyer@example.com."
+          />
+          <p
+            data-testid="direct-target-sip-status"
+            data-status={sipStatus.tone}
+            className={`text-[11px] italic ${
+              sipStatus.tone === "valid"
+                ? "text-green-600"
+                : sipStatus.tone === "invalid"
+                ? "text-red-600"
+                : "text-slate-500"
+            }`}
+          >
+            {sipStatus.text}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+};
+
+const CallHandlingSection: React.FC<{
+  callHandling: CallHandlingConfig;
+  dialIvr: DialIvrSettings;
+  recording: RecordingSettings;
+  updateCallHandling: (next: CallHandlingConfig) => void;
+  updateDialIvr: (next: DialIvrSettings) => void;
+  updateRecording: (next: RecordingSettings) => void;
+}> = ({ callHandling, dialIvr, recording, updateCallHandling, updateDialIvr, updateRecording }) => (
+  <section className="space-y-6">
+    <SectionHeader
+      title="Call Handling"
+      description="Connection timeout, dial IVR, and recording behavior."
+    />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <NumberField
+        label="Connection Timeout (seconds)"
+        testId="call-handling-connection-timeout"
+        value={callHandling.connectionTimeoutSeconds ?? 30}
+        onChange={value =>
+          updateCallHandling({ ...callHandling, connectionTimeoutSeconds: value || undefined })
+        }
+      />
+      <SelectField
+        label="Recording"
+        testId="call-handling-recording"
+        value={recording.mode}
+        onChange={value => updateRecording({ mode: value as RecordingSettings["mode"] })}
+        options={[
+          { value: "account_default", label: "Account default" },
+          { value: "enabled", label: "Enabled" },
+          { value: "disabled", label: "Disabled" },
+        ]}
+      />
+    </div>
+    <div className="space-y-3">
+      <p className="text-xs font-bold text-slate-500 uppercase">Dial IVR</p>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          data-testid="dial-ivr-enabled"
+          type="checkbox"
+          checked={dialIvr.enabled}
+          onChange={event => updateDialIvr({ ...dialIvr, enabled: event.target.checked })}
+        />
+        Press digits on dial
+      </label>
+      {dialIvr.enabled && (
+        <TextField
+          label="Dial Digits"
+          testId="dial-ivr-digits"
+          value={dialIvr.digits || ""}
+          onChange={value => updateDialIvr({ ...dialIvr, digits: value })}
+          helper="Examples: www, www123, 123, www123{{zip}}. 'w' = pause. Digits and # supported. Tokens should resolve to numeric values."
+          tokenInsert={token => updateDialIvr({ ...dialIvr, digits: (dialIvr.digits || "") + token })}
+        />
+      )}
+    </div>
+  </section>
+);
+
+const DuplicateRulesSection: React.FC<{
+  duplicateRules: DuplicateRules;
+  updateDuplicateRules: (next: DuplicateRules) => void;
+}> = ({ duplicateRules, updateDuplicateRules }) => (
+  <section className="space-y-4">
+    <SectionHeader
+      title="Duplicate Rules"
+      description="Restrict the same caller from reaching this buyer twice in a window."
+    />
+    <Segmented
+      testId="duplicate-mode"
+      value={duplicateRules.mode}
+      onChange={value =>
+        updateDuplicateRules({ ...duplicateRules, mode: value as DuplicateRules["mode"] })
+      }
+      options={[
+        { value: "campaign_default", label: "Campaign default" },
+        { value: "buyer_default", label: "Buyer default" },
+        { value: "do_not_restrict", label: "Do not restrict" },
+        { value: "restrict", label: "Restrict" },
+      ]}
+    />
+    {duplicateRules.mode === "restrict" && (
+      <NumberField
+        label="Window (minutes)"
+        testId="duplicate-window"
+        value={duplicateRules.windowMinutes ?? 0}
+        onChange={value =>
+          updateDuplicateRules({ ...duplicateRules, windowMinutes: value || undefined })
+        }
+      />
+    )}
+  </section>
+);
+
+const RevenueRecoverySection: React.FC<{
+  callHandling: CallHandlingConfig;
+  revenue: RevenueSettings;
+  updateCallHandling: (next: CallHandlingConfig) => void;
+  updateRevenue: (next: RevenueSettings) => void;
+}> = ({ callHandling, revenue, updateCallHandling, updateRevenue }) => (
+  <section className="space-y-6">
+    <SectionHeader title="Revenue Recovery" description="Payout, conversion duration, and retry behavior." />
+    <div className="space-y-3">
+      <p className="text-xs font-bold text-slate-500 uppercase">Revenue Recovery</p>
+      <Segmented
+        testId="revenue-recovery-mode"
+        value={callHandling.revenueRecovery ?? "buyer_default"}
+        onChange={value =>
+          updateCallHandling({
+            ...callHandling,
+            revenueRecovery: value as CallHandlingConfig["revenueRecovery"],
+          })
+        }
+        options={[
+          { value: "buyer_default", label: "Buyer default" },
+          { value: "enabled", label: "Enabled" },
+          { value: "disabled", label: "Disabled" },
+        ]}
+      />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <NumberField
+        label="Payout"
+        testId="direct-target-payout"
+        value={revenue.payout ?? 0}
+        onChange={value =>
+          updateRevenue({ ...revenue, mode: "override", payout: value || undefined })
+        }
+      />
+      <NumberField
+        label="Conversion Duration (seconds)"
+        testId="direct-target-conversion-duration"
+        value={revenue.conversionDurationSeconds ?? 0}
+        onChange={value =>
+          updateRevenue({
+            ...revenue,
+            mode: "override",
+            conversionDurationSeconds: value || undefined,
+          })
+        }
+      />
+    </div>
+  </section>
+);
+
+const SHAREABLE_TAG_FIELDS = [
+  "caller_id",
+  "zip",
+  "state",
+  "publisher_id",
+  "campaign_id",
+  "recording_url",
+  "trusted_form",
+  "jornaya",
+] as const;
+
+const ShareableTagsSection: React.FC<{
+  shareableTags: ShareableTagsConfig;
+  updateShareableTags: (next: ShareableTagsConfig) => void;
+}> = ({ shareableTags, updateShareableTags }) => {
+  const selectedTags = new Set(shareableTags.tags || []);
+  const toggleTag = (tag: string) => {
+    const next = new Set(selectedTags);
+    if (next.has(tag)) next.delete(tag);
+    else next.add(tag);
+    updateShareableTags({ ...shareableTags, tags: Array.from(next) });
+  };
+  return (
+    <section className="space-y-4">
+      <SectionHeader
+        title="Shareable Tags"
+        description="Which call attributes get passed to the buyer."
+      />
+      <Segmented
+        testId="shareable-tags-mode"
+        value={shareableTags.mode}
+        onChange={value =>
+          updateShareableTags({ ...shareableTags, mode: value as ShareableTagsConfig["mode"] })
+        }
+        options={[
+          { value: "campaign_default", label: "Campaign default" },
+          { value: "buyer_default", label: "Buyer default" },
+          { value: "override", label: "Override" },
+        ]}
+      />
+      {shareableTags.mode === "override" && (
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              data-testid="shareable-tags-share-call-id"
+              type="checkbox"
+              checked={Boolean(shareableTags.shareInboundCallId)}
+              onChange={event =>
+                updateShareableTags({ ...shareableTags, shareInboundCallId: event.target.checked })
+              }
+            />
+            Share inbound call ID
+          </label>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Tags</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {SHAREABLE_TAG_FIELDS.map(tag => (
+                <label
+                  key={tag}
+                  className="flex items-center gap-2 text-xs text-slate-700 p-2 border rounded-lg"
+                >
+                  <input
+                    data-testid={`shareable-tag-${tag.split("_").join("-")}`}
+                    type="checkbox"
+                    checked={selectedTags.has(tag)}
+                    onChange={() => toggleTag(tag)}
+                  />
+                  {tag}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+const PredictiveRoutingSection: React.FC<{
+  predictiveRouting: PredictiveRoutingConfig;
+  updatePredictiveRouting: (next: PredictiveRoutingConfig) => void;
+}> = ({ predictiveRouting, updatePredictiveRouting }) => {
+  const bump = predictiveRouting.priorityBump ?? 0;
+  return (
+    <section className="space-y-4">
+      <SectionHeader
+        title="Predictive Routing"
+        description="Influence which buyer wins when multiple are eligible."
+      />
+      <Segmented
+        testId="predictive-routing-mode"
+        value={predictiveRouting.mode}
+        onChange={value =>
+          updatePredictiveRouting({
+            ...predictiveRouting,
+            mode: value as PredictiveRoutingConfig["mode"],
+          })
+        }
+        options={[
+          { value: "campaign_default", label: "Campaign default" },
+          { value: "estimated_revenue", label: "Estimated revenue" },
+        ]}
+      />
+      <div className="space-y-2">
+        <label className="block text-xs font-bold text-slate-500 uppercase">
+          Priority Bump
+          <input
+            type="range"
+            data-testid="predictive-routing-priority-bump"
+            min={-10}
+            max={10}
+            value={bump}
+            onChange={event =>
+              updatePredictiveRouting({
+                ...predictiveRouting,
+                priorityBump: Number(event.target.value),
+              })
+            }
+            className="mt-2 w-full"
+          />
+          <span data-testid="predictive-routing-priority-bump-value" className="text-sm normal-case font-normal text-slate-600">
+            {bump}
+          </span>
+        </label>
+      </div>
+    </section>
+  );
+};
 
 // ===================== Field primitives =====================
 

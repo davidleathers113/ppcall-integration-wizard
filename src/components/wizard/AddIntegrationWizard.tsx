@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, Globe, Link, Phone, Settings, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Globe, Link, Phone, PhoneForwarded, Settings, ShieldCheck, Terminal, Zap } from "lucide-react";
 import Card from "../shared/Card";
 import { PRESETS } from "../../data/mockData";
-import type { IntegrationConfig, IntegrationDirection, IntegrationType } from "../../models/appTypes";
+import type {
+  BuyerDestinationKind,
+  IntegrationConfig,
+  IntegrationDirection,
+  IntegrationType,
+} from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
 import { useToast } from "../shared/ToastProvider";
@@ -27,6 +32,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
   const [step, setStep] = useState(hasInitialCampaign && hasInitialDirection ? 2 : hasInitialDirection ? 2 : 1);
   const [direction, setDirection] = useState<IntegrationDirection | null>(initialContext?.direction || null);
   const [type, setType] = useState<IntegrationType | null>(null);
+  const [buyerKind, setBuyerKind] = useState<BuyerDestinationKind | null>(null);
   const [selectedPreset, setSelectedPreset] = useState("custom");
   const [integrationName, setIntegrationName] = useState("");
   const [campaignId, setCampaignId] = useState(initialContext?.campaignId || "");
@@ -57,6 +63,38 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
         expiresInSeconds: type === "rtb" ? config.expiresInSeconds || 30 : config.expiresInSeconds
       };
     }
+    if (buyerKind === "direct_number") {
+      return {
+        ...config,
+        buyerDestinationKind: "direct_number",
+        destinationMode: "static_number",
+        destination: {
+          ...(config.destination || {}),
+          number: config.destination?.number ?? config.destinationNumber ?? "",
+        },
+        destinationNumber: config.destination?.number ?? config.destinationNumber ?? "",
+        payout: config.payout,
+        conversionDurationSeconds: config.conversionDurationSeconds,
+        caps: config.caps,
+        schedule: config.schedule,
+      };
+    }
+    if (buyerKind === "direct_sip") {
+      return {
+        ...config,
+        buyerDestinationKind: "direct_sip",
+        destinationMode: "static_sip",
+        destination: {
+          ...(config.destination || {}),
+          sipAddress: config.destination?.sipAddress ?? config.sipAddress ?? "",
+        },
+        sipAddress: config.destination?.sipAddress ?? config.sipAddress ?? "",
+        payout: config.payout,
+        conversionDurationSeconds: config.conversionDurationSeconds,
+        caps: config.caps,
+        schedule: config.schedule,
+      };
+    }
     if (type === "static_number") {
       return {
         destinationNumber: config.destinationNumber || "",
@@ -76,7 +114,9 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
       };
     }
     return config as IntegrationConfig;
-  }, [campaignId, config, direction, integrationName, type]);
+  }, [buyerKind, campaignId, config, direction, integrationName, type]);
+
+  const isDirectTarget = direction === "buyer" && (buyerKind === "direct_number" || buyerKind === "direct_sip");
 
   const canContinue = () => {
     if (step === 1) return Boolean(direction);
@@ -84,11 +124,23 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
     if (step === 3) return Boolean(campaignId && integrationName.trim());
     if (step === 5) {
       if (direction === "publisher") return Boolean(normalizedConfig.publisherId && (normalizedConfig.postingUrl || normalizedConfig.destinationNumber || normalizedConfig.sipAddress));
+      if (buyerKind === "direct_number")
+        return Boolean(
+          (normalizedConfig.destination?.number || normalizedConfig.destinationNumber) &&
+            normalizedConfig.payout &&
+            normalizedConfig.conversionDurationSeconds
+        );
+      if (buyerKind === "direct_sip")
+        return Boolean(
+          (normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress) &&
+            normalizedConfig.payout &&
+            normalizedConfig.conversionDurationSeconds
+        );
       if (type === "static_number") return Boolean(normalizedConfig.destinationNumber && normalizedConfig.payout && normalizedConfig.conversionDurationSeconds);
       if (type === "sip") return Boolean(normalizedConfig.sipAddress && normalizedConfig.payout && normalizedConfig.conversionDurationSeconds);
       return Boolean(normalizedConfig.url && normalizedConfig.method);
     }
-    if (step === 6 && direction === "buyer" && ["rtb", "generic_api", "webhook"].includes(type || "")) {
+    if (step === 6 && direction === "buyer" && !isDirectTarget && ["rtb", "generic_api", "webhook"].includes(type || "")) {
       return Boolean(normalizedConfig.responseParsing?.acceptedPath && (normalizedConfig.responseParsing.destinationNumberPath || normalizedConfig.responseParsing.sipAddressPath));
     }
     return true;
@@ -107,7 +159,10 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
       config: configToSave
     });
     setSavedIntegrationId(integration.id);
-    setMessage("Draft created. Run a test before activation.");
+    const successMessage = isDirectTarget
+      ? "Direct target draft created. Run a test before activation."
+      : "Draft created. Run a test before activation.";
+    setMessage(successMessage);
     toast.success(`Draft integration "${integration.name}" created.`);
     setStep(9);
   };
@@ -156,21 +211,45 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             </div>
           </div>
         );
-      case 2:
+      case 2: {
+        type TypeOption = {
+          id: IntegrationType;
+          buyerKind?: BuyerDestinationKind;
+          testId: string;
+          label: string;
+          icon: typeof Phone;
+        };
+        const buyerOptions: TypeOption[] = [
+          { id: "static_number", buyerKind: "direct_number", testId: "direct-number", label: "Direct Number Target", icon: PhoneForwarded },
+          { id: "sip", buyerKind: "direct_sip", testId: "direct-sip", label: "Direct SIP Target", icon: Globe },
+          { id: "rtb", buyerKind: "rtb", testId: "rtb", label: "RTB / Ping-Post Target", icon: Zap },
+          { id: "webhook", buyerKind: "webhook", testId: "webhook", label: "Webhook Target", icon: Link },
+          { id: "generic_api", buyerKind: "generic_api", testId: "generic-api", label: "Generic API Target", icon: Terminal },
+        ];
+        const publisherOptions: TypeOption[] = [
+          { id: "static_number", testId: "static-number", label: "Static Number", icon: Phone },
+          { id: "rtb", testId: "rtb", label: "RTB / Ping-Post", icon: Zap },
+          { id: "sip", testId: "sip", label: "SIP Trunking", icon: Globe },
+          { id: "webhook", testId: "webhook", label: "Webhook", icon: Link },
+          { id: "generic_api", testId: "generic-api", label: "Generic API", icon: Terminal },
+        ];
+        const options = direction === "buyer" ? buyerOptions : publisherOptions;
+        const isOptionSelected = (option: TypeOption) =>
+          direction === "buyer"
+            ? type === option.id && buyerKind === (option.buyerKind || null)
+            : type === option.id;
+        const handleSelect = (option: TypeOption) => {
+          setType(option.id);
+          setBuyerKind(direction === "buyer" ? option.buyerKind || null : null);
+        };
         return (
           <div className="space-y-6">
             <h3 className="text-lg font-semibold text-center">Choose Integration Type</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { id: "static_number", testId: "static-number", label: "Static Number", icon: Phone },
-                { id: "rtb", testId: "rtb", label: "RTB / Ping-Post", icon: Zap },
-                { id: "sip", testId: "sip", label: "SIP Trunking", icon: Globe },
-                { id: "webhook", testId: "webhook", label: "Webhook", icon: Link },
-                { id: "generic_api", testId: "generic-api", label: "Generic API", icon: Terminal },
-              ].map(item => {
+              {options.map(item => {
                 const Icon = item.icon;
                 return (
-                  <button data-testid={`wizard-type-${item.testId}`} key={item.id} onClick={() => setType(item.id as IntegrationType)} className={`p-4 border rounded-lg text-center transition-all ${type === item.id ? "border-purple-600 bg-purple-50" : "border-slate-200 hover:border-purple-300"}`}>
+                  <button data-testid={`wizard-type-${item.testId}`} key={item.testId} onClick={() => handleSelect(item)} className={`p-4 border rounded-lg text-center transition-all ${isOptionSelected(item) ? "border-purple-600 bg-purple-50" : "border-slate-200 hover:border-purple-300"}`}>
                     <Icon size={24} className="mx-auto text-slate-500 mb-2" />
                     <span className="text-sm font-medium text-slate-700">{item.label}</span>
                   </button>
@@ -179,6 +258,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             </div>
           </div>
         );
+      }
       case 3:
         return (
           <div className="space-y-4">
@@ -196,6 +276,8 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
         );
       case 4: {
         const presets = Object.entries(PRESETS).filter(([key]) => {
+          if (buyerKind === "direct_number") return key === "direct_number" || key === "static_number";
+          if (buyerKind === "direct_sip") return key === "direct_sip" || key === "sip_endpoint";
           if (type === "static_number") return key.includes("static");
           if (type === "rtb") return key.includes("rtb") || key.includes("ping");
           if (type === "sip") return key.includes("sip");
@@ -227,6 +309,34 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
                 <Field label="Posting URL" value={normalizedConfig.postingUrl || ""} onChange={value => updateConfig("postingUrl", value)} />
                 {type === "rtb" && <NumberField label="Expiration Seconds" value={normalizedConfig.expiresInSeconds || 30} onChange={value => updateConfig("expiresInSeconds", value)} />}
                 <RequiredFields selected={normalizedConfig.requiredFields || []} onToggle={toggleRequiredField} />
+              </>
+            ) : buyerKind === "direct_number" ? (
+              <>
+                <Field testId="wizard-direct-number-input" label="Destination Number" value={normalizedConfig.destination?.number || normalizedConfig.destinationNumber || ""} onChange={value => {
+                  setConfig(current => ({
+                    ...current,
+                    destinationNumber: value,
+                    destination: { ...(current.destination || {}), number: value },
+                  }));
+                }} />
+                <p className="text-[11px] text-slate-500 italic">Use country code format, such as +12223334444.</p>
+                <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
+                <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
+                <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
+              </>
+            ) : buyerKind === "direct_sip" ? (
+              <>
+                <Field testId="wizard-direct-sip-input" label="SIP Address" value={normalizedConfig.destination?.sipAddress || normalizedConfig.sipAddress || ""} onChange={value => {
+                  setConfig(current => ({
+                    ...current,
+                    sipAddress: value,
+                    destination: { ...(current.destination || {}), sipAddress: value },
+                  }));
+                }} />
+                <p className="text-[11px] text-slate-500 italic">Use a SIP URI such as sip:buyer@example.com.</p>
+                <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
+                <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
+                <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
               </>
             ) : type === "static_number" ? (
               <>
@@ -260,8 +370,12 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Response Parsing</h3>
-            {direction === "publisher" || type === "static_number" || type === "sip" ? (
-              <div className="p-4 bg-slate-50 border rounded-lg text-sm text-slate-600">This integration type does not require buyer response JSON parsing.</div>
+            {direction === "publisher" || isDirectTarget || type === "static_number" || type === "sip" ? (
+              <div data-testid="wizard-no-parsing-required" className="p-4 bg-slate-50 border rounded-lg text-sm text-slate-600">
+                {isDirectTarget
+                  ? "Direct targets route calls to a number or SIP destination. No buyer response JSON parsing is required."
+                  : "This integration type does not require buyer response JSON parsing."}
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Field label="Accepted Path" value={normalizedConfig.responseParsing?.acceptedPath || ""} onChange={value => updateParsing("acceptedPath", value)} />
@@ -409,6 +523,54 @@ const NumberField = ({ label, value, onChange }: { label: string; value: number;
     <input type="number" className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={value || ""} onChange={event => onChange(Number(event.target.value))} />
   </label>
 );
+
+const DirectScheduleAndCapFields = ({ config, setConfig }: { config: IntegrationConfig; setConfig: React.Dispatch<React.SetStateAction<Partial<IntegrationConfig>>> }) => {
+  const timezone = config.schedule?.timezone || "America/New_York";
+  const dailyCap = config.caps?.daily ?? 0;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+      <label className="block text-xs font-bold text-slate-500 uppercase">Timezone
+        <select
+          data-testid="wizard-direct-timezone"
+          className="mt-1 w-full p-2 border rounded-lg text-sm bg-white normal-case"
+          value={timezone}
+          onChange={event => setConfig(current => ({
+            ...current,
+            schedule: {
+              timezone: event.target.value,
+              days: current.schedule?.days || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+              startTime: current.schedule?.startTime || "00:00",
+              endTime: current.schedule?.endTime || "23:59",
+              mode: current.schedule?.mode || "always_open",
+            },
+          }))}
+        >
+          {["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Phoenix", "UTC"].map(tz => (
+            <option key={tz} value={tz}>{tz}</option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-xs font-bold text-slate-500 uppercase">Daily Cap
+        <input
+          type="number"
+          data-testid="wizard-direct-daily-cap"
+          className="mt-1 w-full p-2 border rounded-lg text-sm normal-case"
+          value={dailyCap || ""}
+          onChange={event => {
+            const next = Number(event.target.value);
+            setConfig(current => ({
+              ...current,
+              caps: {
+                ...(current.caps || {}),
+                daily: next > 0 ? next : undefined,
+              },
+            }));
+          }}
+        />
+      </label>
+    </div>
+  );
+};
 
 const RequiredFields = ({ selected, onToggle }: { selected: string[]; onToggle: (field: string) => void }) => (
   <div>

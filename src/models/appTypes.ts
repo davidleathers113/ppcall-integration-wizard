@@ -30,10 +30,12 @@ export type IntegrationStatus =
   | "paused"
   | "archived";
 
+export type CapOnMode = "connected_calls" | "converted_calls" | "revenue";
+
 export interface IntegrationCaps {
   daily?: number;
   hourly?: number;
-  capOn?: "connected_calls" | "converted_calls";
+  capOn?: CapOnMode;
   global?: number;
   monthly?: number;
   concurrency?: number;

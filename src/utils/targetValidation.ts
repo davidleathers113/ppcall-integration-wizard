@@ -31,10 +31,6 @@ const KNOWN_NUMERIC_TOKENS = new Set([
   "duration",
 ]);
 
-function isDigit(ch: string): boolean {
-  return ch >= "0" && ch <= "9";
-}
-
 export function normalizePhoneNumber(value: string): string {
   if (!value) return "";
   let result = "";
