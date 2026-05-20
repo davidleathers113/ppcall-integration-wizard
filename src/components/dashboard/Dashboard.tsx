@@ -60,23 +60,29 @@ const Dashboard: React.FC = () => {
         {/* Main Feed */}
         <div className="lg:col-span-2 space-y-6">
           <Card title="Integration Health" subtitle="Integrations requiring attention">
-            <div className="divide-y divide-slate-100">
-              {needingAttention.map(int => (
-                  <div key={int.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-2 h-2 rounded-full ${
-                        int.currentStatus === "failing" ? "bg-red-500" : 
-                        int.currentStatus === "stale" ? "bg-slate-400" : "bg-yellow-500"
-                      }`} />
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">{int.name}</p>
-                        <p className="text-xs text-slate-500">{int.direction} • {int.type.toUpperCase()}</p>
+            {needingAttention.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-500">No issues detected. All integrations are healthy.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {needingAttention.map(int => (
+                    <div key={int.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-2 h-2 rounded-full ${
+                          int.currentStatus === "failing" ? "bg-red-500" :
+                          int.currentStatus === "stale" ? "bg-slate-400" : "bg-yellow-500"
+                        }`} />
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{int.name}</p>
+                          <p className="text-xs text-slate-500">{int.direction} • {int.type.toUpperCase()}</p>
+                        </div>
                       </div>
+                      <Badge variant={int.currentStatus}>{int.currentStatus}</Badge>
                     </div>
-                    <Badge variant={int.currentStatus}>{int.currentStatus}</Badge>
-                  </div>
-                ))}
-            </div>
+                  ))}
+              </div>
+            )}
           </Card>
         </div>
 

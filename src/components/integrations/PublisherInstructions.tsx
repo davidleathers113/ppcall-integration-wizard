@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Copy, Check, Download } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import type { Integration } from "../../models/appTypes";
 import Card from "../shared/Card";
 
@@ -48,8 +48,8 @@ const PublisherInstructions: React.FC<PublisherInstructionsProps> = ({ integrati
           <h3 className="text-sm font-bold text-slate-900">Integration Guidelines</h3>
           <p className="text-xs text-slate-500">Provide these instructions to your publisher to begin receiving traffic.</p>
         </div>
-        <button onClick={() => handleCopy("markdown", instructionsJson)} className="px-3 py-1.5 text-xs font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 flex items-center gap-1">
-          {copiedId === "markdown" ? <Check size={14} /> : <Download size={14} />} Copy .md
+        <button onClick={() => handleCopy("json", instructionsJson)} className="px-3 py-1.5 text-xs font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 flex items-center gap-1">
+          {copiedId === "json" ? <Check size={14} /> : <Copy size={14} />} Copy JSON
         </button>
       </div>
 
