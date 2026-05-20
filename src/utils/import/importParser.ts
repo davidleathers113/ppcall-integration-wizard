@@ -3,7 +3,11 @@ import type { ImportIssue, ParseResult, ParsedImportRow } from "./importSchema";
 
 export function parseCsvImport(content: string, maxRows = 50): ParseResult {
   const errors: ImportIssue[] = [];
-  const cleaned = content.replace(/^\uFEFF/, "");
+  // Remove BOM (Byte Order Mark) if present - using string methods instead of regex
+  let cleaned = content;
+  if (cleaned.charCodeAt(0) === 0xFEFF) {
+    cleaned = cleaned.substring(1);
+  }
   if (!cleaned.trim()) {
     return { rows: [], headers: [], errors: [{ code: "empty_file", message: "CSV content is empty." }] };
   }
@@ -11,7 +15,14 @@ export function parseCsvImport(content: string, maxRows = 50): ParseResult {
   const parsed = Papa.parse<Record<string, string>>(cleaned, {
     header: true,
     skipEmptyLines: "greedy",
-    transformHeader: header => header.replace(/^\uFEFF/, "").trim(),
+    transformHeader: header => {
+      // Remove BOM from header if present - using string methods instead of regex
+      let clean = header;
+      if (clean.charCodeAt(0) === 0xFEFF) {
+        clean = clean.substring(1);
+      }
+      return clean.trim();
+    },
   });
 
   const headers = parsed.meta.fields?.filter(Boolean) || [];

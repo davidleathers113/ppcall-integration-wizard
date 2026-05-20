@@ -10,10 +10,16 @@ interface PublisherInstructionsProps {
 const PublisherInstructions: React.FC<PublisherInstructionsProps> = ({ integration }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopy = (id: string, text: string) => {
-    void navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      // Clipboard write failed - could be permissions or browser support issue
+      console.error("Failed to copy to clipboard:", error);
+      // Don't set copied state if the operation failed
+    }
   };
 
   const { config } = integration;

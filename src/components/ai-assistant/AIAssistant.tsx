@@ -162,7 +162,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
 
 function buildProposal(instructions: string): AIConfigProposal {
   const lower = instructions.toLowerCase();
-  const url = instructions.match(/https?:\/\/[^\s"')]+/)?.[0];
+
+  // Extract URL using string methods instead of regex
+  const url = extractUrl(instructions);
+
   const direction: IntegrationDirection = lower.includes("publisher") || lower.includes("supplier") || lower.includes("post traffic") ? "publisher" : "buyer";
   const type: IntegrationType = lower.includes("sip") ? "sip" : lower.includes("static") || lower.includes("direct number") ? "static_number" : lower.includes("webhook") ? "webhook" : "rtb";
   const method = lower.includes("get") && !lower.includes("post") ? "GET" : "POST";
@@ -172,8 +175,13 @@ function buildProposal(instructions: string): AIConfigProposal {
   const bidField = firstMatch(lower, ["bid", "payout", "price"]) || "payout";
   const rejectField = firstMatch(lower, ["rejection_reason", "reason", "message"]) || "reason";
   const expirationField = firstMatch(lower, ["expires_in_seconds", "expireinseconds", "expiration"]);
-  const publisherId = instructions.match(/\bpub[_-][a-z0-9_-]+\b/i)?.[0];
-  const expirationSeconds = Number(instructions.match(/\b(?:expires_in_seconds|expiration|expires?|expire)\D{0,20}(\d{2,5})\b/i)?.[1]);
+
+  // Extract publisher ID using string methods instead of regex
+  const publisherId = extractPublisherId(instructions);
+
+  // Extract expiration seconds using string methods instead of regex
+  const expirationSeconds = extractExpirationSeconds(instructions);
+
   const warnings: string[] = [];
 
   if (!url && direction === "buyer" && type !== "static_number" && type !== "sip") warnings.push("No endpoint URL detected; using a placeholder URL.");
@@ -254,6 +262,109 @@ function buildProposal(instructions: string): AIConfigProposal {
 
 function firstMatch(value: string, fields: string[]): string | undefined {
   return fields.find(field => value.includes(field.toLowerCase()));
+}
+
+// Helper: Extract URL from instructions using string methods instead of regex
+function extractUrl(text: string): string | undefined {
+  // Look for http:// or https://
+  const httpIndex = text.indexOf('http://');
+  const httpsIndex = text.indexOf('https://');
+
+  let startIndex = -1;
+  if (httpIndex !== -1 && httpsIndex !== -1) {
+    startIndex = Math.min(httpIndex, httpsIndex);
+  } else if (httpIndex !== -1) {
+    startIndex = httpIndex;
+  } else if (httpsIndex !== -1) {
+    startIndex = httpsIndex;
+  }
+
+  if (startIndex === -1) return undefined;
+
+  // Find the end of the URL (space, quote, parenthesis, or end of string)
+  let endIndex = text.length;
+  const terminators = [' ', '"', "'", ')', '\n', '\t'];
+
+  for (const term of terminators) {
+    const termIndex = text.indexOf(term, startIndex);
+    if (termIndex !== -1 && termIndex < endIndex) {
+      endIndex = termIndex;
+    }
+  }
+
+  return text.substring(startIndex, endIndex);
+}
+
+// Helper: Extract publisher ID pattern like pub_123 or pub-abc using string methods instead of regex
+function extractPublisherId(text: string): string | undefined {
+  const lower = text.toLowerCase();
+
+  // Look for patterns like "pub_" or "pub-"
+  let pos = 0;
+  while (pos < lower.length) {
+    const pubIndex = lower.indexOf('pub', pos);
+    if (pubIndex === -1) break;
+
+    // Check if it's followed by _ or -
+    if (pubIndex + 3 < lower.length) {
+      const nextChar = lower[pubIndex + 3];
+      if (nextChar === '_' || nextChar === '-') {
+        // Extract the full ID
+        let endIndex = pubIndex + 4;
+        while (endIndex < lower.length) {
+          const char = lower[endIndex];
+          const isValid = (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char === '_' || char === '-';
+          if (!isValid) break;
+          endIndex++;
+        }
+
+        if (endIndex > pubIndex + 4) {
+          // Return the original case version
+          return text.substring(pubIndex, endIndex);
+        }
+      }
+    }
+
+    pos = pubIndex + 1;
+  }
+
+  return undefined;
+}
+
+// Helper: Extract expiration seconds from text like "expires in 30 seconds" using string methods instead of regex
+function extractExpirationSeconds(text: string): number {
+  const lower = text.toLowerCase();
+
+  // Look for expiration-related keywords
+  const keywords = ['expires_in_seconds', 'expirationinseconds', 'expiration', 'expires', 'expire'];
+
+  for (const keyword of keywords) {
+    const keywordIndex = lower.indexOf(keyword);
+    if (keywordIndex === -1) continue;
+
+    // Look for a number within 30 characters after the keyword
+    const searchStart = keywordIndex + keyword.length;
+    const searchEnd = Math.min(searchStart + 30, lower.length);
+    const searchRegion = text.substring(searchStart, searchEnd);
+
+    // Extract digits
+    let numberStr = '';
+    for (const char of searchRegion) {
+      if (char >= '0' && char <= '9') {
+        numberStr += char;
+      } else if (numberStr.length > 0) {
+        // Stop at first non-digit after we've found digits
+        break;
+      }
+    }
+
+    if (numberStr.length >= 2 && numberStr.length <= 5) {
+      const num = parseInt(numberStr, 10);
+      if (num > 0) return num;
+    }
+  }
+
+  return 0;
 }
 
 export default AIAssistant;

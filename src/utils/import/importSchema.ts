@@ -142,7 +142,31 @@ export const IMPORT_FIELDS: Record<ImportFieldKey, { label: string; required?: b
 export const IMPORT_FIELD_KEYS = Object.keys(IMPORT_FIELDS) as ImportFieldKey[];
 
 export function normalizeHeader(value: string): string {
-  return value.trim().replace(/^\uFEFF/, "").toLowerCase().replace(/[\s-]+/g, "_");
+  // Remove BOM (Byte Order Mark) if present - using string methods instead of regex
+  let normalized = value.trim();
+  if (normalized.charCodeAt(0) === 0xFEFF) {
+    normalized = normalized.substring(1);
+  }
+
+  // Replace spaces and hyphens with underscores - using string methods instead of regex
+  normalized = normalized.toLowerCase();
+  const chars = normalized.split('');
+  let result = '';
+  let lastWasUnderscore = false;
+
+  for (const char of chars) {
+    if (char === ' ' || char === '-') {
+      if (!lastWasUnderscore && result.length > 0) {
+        result += '_';
+        lastWasUnderscore = true;
+      }
+    } else {
+      result += char;
+      lastWasUnderscore = false;
+    }
+  }
+
+  return result;
 }
 
 export function autoMapColumn(sourceColumn: string): ColumnMapping {

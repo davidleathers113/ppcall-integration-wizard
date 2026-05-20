@@ -51,6 +51,12 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
           status: "fail",
           message: "Timeout must not exceed 5 seconds for RTB/Ping-Post."
         });
+      } else if (timeout > 3) {
+        checklist.push({
+          label: "Timeout within limit",
+          status: "warning",
+          message: `Timeout is ${timeout}s. Consider reducing to 3s or less for faster RTB responses.`
+        });
       }
     } else if (integration.type === "static_number") {
       checklist.push({
@@ -162,6 +168,22 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
         status: (config.responseParsing.destinationNumberPath || config.responseParsing.sipAddressPath) ? "pass" : "fail",
         message: (config.responseParsing.destinationNumberPath || config.responseParsing.sipAddressPath) ? "Transfer path found." : "Destination number or SIP path is missing."
       });
+
+      // Optional but recommended fields - generate warnings
+      if (!config.responseParsing.bidPath && integration.type === "rtb") {
+        checklist.push({
+          label: "Bid path configured",
+          status: "warning",
+          message: "Bid/payout path not configured. Consider adding bidPath for dynamic payout tracking."
+        });
+      }
+      if (!config.responseParsing.rejectReasonPath) {
+        checklist.push({
+          label: "Reject reason path configured",
+          status: "warning",
+          message: "Reject reason path not configured. Recommended for debugging failed bids."
+        });
+      }
 
       // Actually parse
       const extractedAccepted = config.responseParsing.acceptedPath ? extractJsonPath(rawResponse, config.responseParsing.acceptedPath) : undefined;

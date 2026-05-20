@@ -19,9 +19,47 @@ export const DEFAULT_TOKENS: Record<string, string> = {
 };
 
 export function resolveTokens(input: string, tokens: Record<string, string> = DEFAULT_TOKENS): string {
-  return input.replace(/\{\{([^{}]+)\}\}/g, (match, tokenName) => {
-    return tokens[tokenName.trim()] || match;
-  });
+  // Replace {{token}} patterns using string methods instead of regex
+  let result = '';
+  let pos = 0;
+
+  while (pos < input.length) {
+    const openIndex = input.indexOf('{{', pos);
+
+    if (openIndex === -1) {
+      // No more tokens, append rest of string
+      result += input.substring(pos);
+      break;
+    }
+
+    // Append text before the token
+    result += input.substring(pos, openIndex);
+
+    // Find the closing braces
+    const closeIndex = input.indexOf('}}', openIndex + 2);
+
+    if (closeIndex === -1) {
+      // No closing braces found, treat as literal text
+      result += input.substring(openIndex);
+      break;
+    }
+
+    // Extract token name (without the braces)
+    const tokenName = input.substring(openIndex + 2, closeIndex).trim();
+
+    // Replace with token value or keep original if not found
+    if (tokenName && tokens[tokenName] !== undefined) {
+      result += tokens[tokenName];
+    } else {
+      // Keep original token pattern if not found
+      result += input.substring(openIndex, closeIndex + 2);
+    }
+
+    // Move position past the closing braces
+    pos = closeIndex + 2;
+  }
+
+  return result;
 }
 
 export function resolveObjectTokens(obj: unknown, tokens: Record<string, string> = DEFAULT_TOKENS): unknown {
