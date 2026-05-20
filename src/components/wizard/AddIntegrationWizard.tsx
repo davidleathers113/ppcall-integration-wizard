@@ -14,20 +14,23 @@ import {
 import Card from "../shared/Card";
 
 import { PRESETS } from "../../data/mockData";
-import type { IntegrationDirection, IntegrationType, IntegrationConfig, Integration } from "../../models/appTypes";
+import type { IntegrationDirection, IntegrationType, IntegrationConfig } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
 
 interface AddIntegrationWizardProps {
   onComplete?: (id: string) => void;
 }
 
 const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete }) => {
-  const { state, dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<IntegrationDirection | null>(null);
   const [type, setType] = useState<IntegrationType | null>(null);
   
   const [formData, setFormData] = useState<Partial<IntegrationConfig>>({});
+  const [selectedPreset, setSelectedPreset] = useState("custom");
   const [integrationName, setIntegrationName] = useState("");
   const [campaignId, setCampaignId] = useState("");
   const [savedIntegrationId, setSavedIntegrationId] = useState<string | null>(null);
@@ -36,40 +39,19 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
   const prevStep = () => setStep(s => s - 1);
 
   const handleSaveDraft = () => {
-    const id = `int_${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date().toISOString();
-    const newInt: Integration = {
-      id,
+    if (!direction || !type || !campaignId || !integrationName.trim()) return;
+
+    const integration = actions.createIntegration({
       campaignId: campaignId || state.campaigns[0].id,
       name: integrationName || "New Integration",
-      direction: direction as IntegrationDirection,
-      type: type as IntegrationType,
-      platformPreset: "custom",
+      direction,
+      type,
+      platformPreset: selectedPreset,
       status: "draft",
-      config: formData as IntegrationConfig,
-      createdAt: now,
-      createdBy: "User",
-      updatedAt: now,
-      updatedBy: "User",
-      usageCount: 0,
-      errorRate: 0
-    };
-
-    dispatch({ type: "CREATE_INTEGRATION", payload: newInt });
-    dispatch({ 
-      type: "ADD_ACTIVITY", 
-      payload: {
-        id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-        integrationId: id,
-        campaignId: newInt.campaignId,
-        eventType: "created",
-        message: `Created draft integration ${newInt.name}.`,
-        createdAt: now,
-        actor: "User"
-      }
+      config: formData as IntegrationConfig
     });
 
-    setSavedIntegrationId(id);
+    setSavedIntegrationId(integration.id);
     nextStep();
   };
 
@@ -144,7 +126,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
               {presets.map(([key, p]) => (
                 <button 
                   key={key}
-                  onClick={() => { setFormData(p.config); nextStep(); }}
+                  onClick={() => { setSelectedPreset(key); setFormData(p.config); nextStep(); }}
                   className="w-full p-4 border border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50 transition-all"
                 >
                   <span className="font-medium text-slate-900">{p.name}</span>
@@ -152,7 +134,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
                 </button>
               ))}
               <button 
-                onClick={() => { nextStep(); }}
+                onClick={() => { setSelectedPreset("custom"); nextStep(); }}
                 className="w-full p-4 border border-slate-200 border-dashed rounded-lg flex items-center justify-between hover:bg-slate-50 transition-all"
               >
                 <span className="font-medium text-slate-500 italic">Custom / Manual Setup</span>
@@ -241,7 +223,8 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
             </div>
             <button 
               onClick={handleSaveDraft}
-              className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors"
+              disabled={!direction || !type || !campaignId || !integrationName.trim()}
+              className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-slate-200 transition-colors"
             >
               Save Draft Integration
             </button>

@@ -2,28 +2,13 @@ import React from "react";
 import { Zap, AlertCircle, History, Clock, CheckCircle2, TrendingUp } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
-import { calculateFreshnessStatus } from "../../utils/freshness";
 import { useAppContext } from "../../store/AppStore";
+import { selectDashboardStats, selectIntegrationsNeedingAttention } from "../../store/selectors";
 
 const Dashboard: React.FC = () => {
   const { state } = useAppContext();
-  
-  const integrationsWithStatus = state.integrations.map(int => ({
-    ...int,
-    currentStatus: calculateFreshnessStatus(int)
-  }));
-
-  const stats = {
-    active: integrationsWithStatus.filter(i => i.currentStatus === "active").length,
-    needsTesting: integrationsWithStatus.filter(i => i.currentStatus === "needs_testing" || i.currentStatus === "needs_retest").length,
-    failing: integrationsWithStatus.filter(i => i.currentStatus === "failing").length,
-    stale: integrationsWithStatus.filter(i => i.currentStatus === "stale" || i.currentStatus === "dormant").length,
-    usedThisWeek: integrationsWithStatus.filter(i => {
-      if (!i.lastUsedAt) return false;
-      const days = (new Date().getTime() - new Date(i.lastUsedAt).getTime()) / (1000 * 60 * 60 * 24);
-      return days <= 7;
-    }).length,
-  };
+  const stats = selectDashboardStats(state);
+  const needingAttention = selectIntegrationsNeedingAttention(state);
 
   return (
     <div className="space-y-6">
@@ -76,9 +61,7 @@ const Dashboard: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card title="Integration Health" subtitle="Integrations requiring attention">
             <div className="divide-y divide-slate-100">
-              {integrationsWithStatus
-                .filter(i => ["failing", "stale", "needs_retest", "needs_testing"].includes(i.currentStatus))
-                .map(int => (
+              {needingAttention.map(int => (
                   <div key={int.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className={`w-2 h-2 rounded-full ${

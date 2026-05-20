@@ -1,8 +1,10 @@
 import React from "react";
 import { Copy, Globe, Lock } from "lucide-react";
 import Card from "../shared/Card";
+import { useAppActions } from "../../store/useAppActions";
 
 const DeveloperDocs: React.FC = () => {
+  const actions = useAppActions();
   const endpoints = [
     { method: "POST", path: "/api/integrations", desc: "Create a new integration" },
     { method: "GET", path: "/api/integrations/:id", desc: "Retrieve integration details" },
@@ -41,6 +43,9 @@ const DeveloperDocs: React.FC = () => {
       <header>
         <h2 className="text-2xl font-bold text-slate-900">Developer API</h2>
         <p className="text-slate-500">Programmatically manage your integrations using our REST API.</p>
+        <button onClick={() => actions.resetMockData()} className="mt-3 px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold">
+          Reset Mock Data
+        </button>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

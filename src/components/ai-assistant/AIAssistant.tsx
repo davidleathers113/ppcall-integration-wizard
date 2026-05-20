@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { Bot, Wand2, Sparkles, CheckCircle, AlertTriangle, FileCode } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
-import type { IntegrationDirection, IntegrationType, IntegrationConfig, Integration } from "../../models/appTypes";
+import type { IntegrationDirection, IntegrationType, IntegrationConfig } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
 
 interface AIConfigProposal {
   direction?: IntegrationDirection;
@@ -15,11 +16,14 @@ interface AIConfigProposal {
 }
 
 const AIAssistant: React.FC = () => {
-  const { state, dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
   const [instructions, setInstructions] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [proposedConfig, setProposedConfig] = useState<AIConfigProposal | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [campaignId, setCampaignId] = useState(state.campaigns[0]?.id || "");
+  const [draftName, setDraftName] = useState("AI Generated Buyer");
 
   const handleAnalyze = () => {
     setIsAnalyzing(true);
@@ -27,10 +31,12 @@ const AIAssistant: React.FC = () => {
       // Rule-based extraction simulation
       const hasUrl = instructions.match(/https?:\/\/[^\s]+/);
       const isPost = instructions.toLowerCase().includes("post");
-      const hasAccepted = instructions.toLowerCase().includes("accepted");
+      const lower = instructions.toLowerCase();
+      const hasAccepted = lower.includes("accepted");
+      const isPublisher = lower.includes("publisher") || lower.includes("post traffic") || lower.includes("supplier");
       
       setProposedConfig({
-        direction: "buyer",
+        direction: isPublisher ? "publisher" : "buyer",
         type: "rtb",
         config: {
           method: isPost ? "POST" : "GET",
@@ -45,7 +51,7 @@ const AIAssistant: React.FC = () => {
             acceptedPath: hasAccepted ? "$.accepted" : "$.status",
             acceptedValue: true,
             destinationNumberPath: "$.phone_number",
-            bidPath: "$.payout",
+            bidPath: lower.includes("bid") ? "$.bid" : "$.payout",
             rejectReasonPath: "$.reason"
           }
         },
@@ -62,37 +68,16 @@ const AIAssistant: React.FC = () => {
   const handleApply = () => {
     if (!proposedConfig) return;
 
-    const mockIntegration: Integration = {
-      id: `int_${Math.random().toString(36).substr(2, 9)}`,
-      campaignId: state.campaigns[0].id,
-      name: "AI Generated Buyer",
+    const integration = actions.applyAIConfigToDraft({
+      campaignId,
+      name: draftName,
       direction: proposedConfig.direction || "buyer",
       type: proposedConfig.type || "rtb",
       platformPreset: "custom",
       status: "draft",
-      config: proposedConfig.config as IntegrationConfig,
-      createdAt: new Date().toISOString(),
-      createdBy: "AI Assistant",
-      updatedAt: new Date().toISOString(),
-      updatedBy: "AI Assistant",
-      usageCount: 0,
-      errorRate: 0
-    };
-    
-    dispatch({ type: "CREATE_INTEGRATION", payload: mockIntegration });
-    dispatch({
-      type: "ADD_ACTIVITY",
-      payload: {
-        id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-        integrationId: mockIntegration.id,
-        campaignId: mockIntegration.campaignId,
-        eventType: "created",
-        message: "Draft integration created from AI Assistant.",
-        createdAt: new Date().toISOString(),
-        actor: "AI Assistant"
-      }
+      config: proposedConfig.config as IntegrationConfig
     });
-    setMessage("Draft integration created from AI proposal.");
+    setMessage(`Draft integration created from AI proposal: ${integration.name}.`);
   };
 
   const handleCopyProposal = () => {
@@ -165,6 +150,18 @@ const AIAssistant: React.FC = () => {
               >
                 <div className="space-y-6">
                   <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <label className="text-xs font-bold text-slate-500 uppercase">
+                        Draft Name
+                        <input className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={draftName} onChange={event => setDraftName(event.target.value)} />
+                      </label>
+                      <label className="text-xs font-bold text-slate-500 uppercase">
+                        Campaign
+                        <select className="mt-1 w-full p-2 border rounded-lg text-sm normal-case bg-white" value={campaignId} onChange={event => setCampaignId(event.target.value)}>
+                          {state.campaigns.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+                        </select>
+                      </label>
+                    </div>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Warnings & Recommendations</p>
                     {proposedConfig?.warnings?.map((w: string, i: number) => (
                       <div key={i} className="flex gap-2 p-2 bg-amber-50 border border-amber-100 rounded text-xs text-amber-700">
@@ -191,6 +188,7 @@ const AIAssistant: React.FC = () => {
 
                   <button 
                     onClick={handleApply}
+                    disabled={!campaignId || !draftName.trim()}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
                   >
                     <CheckCircle size={18} />

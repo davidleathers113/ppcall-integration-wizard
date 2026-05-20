@@ -1,31 +1,25 @@
 import React from "react";
-import type { Integration } from "../../models/appTypes";
-import { useAppContext } from "../../store/AppStore";
+import type { Integration, IntegrationConfig } from "../../models/appTypes";
+import { useAppActions } from "../../store/useAppActions";
 
 interface BuyerConfigFormProps {
   integration: Integration;
 }
 
 const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
-  const { dispatch } = useAppContext();
+  const actions = useAppActions();
   
-  const updateConfig = (key: string, value: unknown) => {
-    const updated = {
-      ...integration,
-      updatedAt: new Date().toISOString(),
+  const updateConfig = <Key extends keyof IntegrationConfig>(key: Key, value: IntegrationConfig[Key]) => {
+    actions.updateIntegration(integration.id, {
       config: {
         ...integration.config,
         [key]: value
       }
-    };
-    dispatch({ type: "UPDATE_INTEGRATION", payload: updated });
-    // Also append activity (omitted for brevity here, handled by store ideally or wrapped)
+    }, { message: "Updated buyer config." });
   };
 
   const updateResponseParsing = (key: string, value: string) => {
-    const updated = {
-      ...integration,
-      updatedAt: new Date().toISOString(),
+    actions.updateIntegration(integration.id, {
       config: {
         ...integration.config,
         responseParsing: {
@@ -33,8 +27,7 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
           [key]: value
         }
       }
-    };
-    dispatch({ type: "UPDATE_INTEGRATION", payload: updated });
+    }, { message: "Updated response parsing config." });
   };
 
   const config = integration.config;
@@ -49,7 +42,7 @@ const BuyerConfigForm: React.FC<BuyerConfigFormProps> = ({ integration }) => {
             <select 
               className="w-full p-2 border rounded-lg text-sm bg-white"
               value={config.method || "POST"}
-              onChange={(e) => updateConfig("method", e.target.value)}
+              onChange={(e) => updateConfig("method", e.target.value as IntegrationConfig["method"])}
             >
               <option value="POST">POST</option>
               <option value="GET">GET</option>

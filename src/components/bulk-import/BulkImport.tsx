@@ -3,11 +3,12 @@ import { Upload, AlertCircle, CheckCircle, FileText, Download } from "lucide-rea
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
 import { validateImports, type ValidationResult } from "../../utils/importParser";
-import type { Integration } from "../../models/appTypes";
 
 const BulkImport: React.FC = () => {
-  const { state, dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
   const [importType, setImportType] = useState<"csv" | "json">("csv");
   const [content, setContent] = useState("");
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
@@ -15,7 +16,7 @@ const BulkImport: React.FC = () => {
 
   const handleValidate = () => {
     if (content.trim()) {
-      setValidationResults(validateImports(content, importType, state.campaigns.map(campaign => campaign.id)));
+      setValidationResults(validateImports(content, importType, state.campaigns));
       setImportMessage(null);
     }
   };
@@ -27,41 +28,15 @@ const BulkImport: React.FC = () => {
       return;
     }
 
-    const importedIntegrations: Integration[] = importableRows.map(result => {
-      const now = new Date().toISOString();
-      return {
-        id: `int_${Math.random().toString(36).substr(2, 9)}`,
+    const importedIntegrations = actions.bulkImportIntegrations(importableRows.map(result => ({
         campaignId: result.parsedData!.campaignId!,
         name: result.parsedData!.name!,
         direction: result.parsedData!.direction!,
         type: result.parsedData!.type!,
         platformPreset: result.parsedData!.platformPreset || "custom",
         status: result.parsedData!.status || "draft",
-        config: result.parsedData!.config || {},
-        createdAt: now,
-        createdBy: "Bulk Importer",
-        updatedAt: now,
-        updatedBy: "Bulk Importer",
-        usageCount: 0,
-        errorRate: 0
-      };
-    });
-    
-    dispatch({ type: "BULK_IMPORT", payload: importedIntegrations });
-    importedIntegrations.forEach(integration => {
-      dispatch({
-        type: "ADD_ACTIVITY",
-        payload: {
-        id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-        integrationId: integration.id,
-        campaignId: integration.campaignId,
-        eventType: "created",
-        message: `Imported ${integration.name} via Bulk CSV/JSON import.`,
-        createdAt: new Date().toISOString(),
-        actor: "Bulk Importer"
-        }
-      });
-    });
+        config: result.parsedData!.config || {}
+      })));
 
     setContent("");
     setValidationResults([]);

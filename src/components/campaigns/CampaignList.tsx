@@ -3,26 +3,22 @@ import { Plus, ExternalLink } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
 
 interface CampaignListProps {
   onSelectCampaign: (id: string) => void;
 }
 
 const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
-  const { state, dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
 
   const handleCreateCampaign = () => {
-    const now = new Date().toISOString();
     const campaignNumber = state.campaigns.length + 1;
-    dispatch({
-      type: "CREATE_CAMPAIGN",
-      payload: {
-        id: `camp_mock_${campaignNumber}`,
-        name: `New Mock Campaign ${campaignNumber}`,
-        vertical: "General",
-        status: "draft",
-        createdAt: now
-      }
+    actions.createCampaign({
+      name: `New Mock Campaign ${campaignNumber}`,
+      vertical: "General",
+      status: "draft"
     });
   };
   

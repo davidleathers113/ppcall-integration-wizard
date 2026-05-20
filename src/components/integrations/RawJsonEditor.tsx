@@ -1,14 +1,16 @@
 import React, { useState } from "react";
 import { CheckCircle, Code, Copy, RefreshCw } from "lucide-react";
-import type { Integration } from "../../models/appTypes";
+import type { Integration, IntegrationDirection, IntegrationStatus, IntegrationType } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
 
 interface RawJsonEditorProps {
   integration: Integration;
 }
 
 const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
-  const { dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
   const [jsonText, setJsonText] = useState(() => JSON.stringify(integration, null, 2));
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -16,9 +18,12 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
   const handleValidateAndSave = () => {
     try {
       const parsed = JSON.parse(jsonText);
-      // Basic validation
-      if (!parsed.id || !parsed.config) {
-        throw new Error("Invalid schema: missing 'id' or 'config'");
+      assertIntegration(parsed);
+      if (parsed.id !== integration.id && state.integrations.some(item => item.id === parsed.id)) {
+        throw new Error("Invalid schema: id collides with another integration");
+      }
+      if (!state.campaigns.some(campaign => campaign.id === parsed.campaignId)) {
+        throw new Error("Invalid schema: campaignId does not match an existing campaign");
       }
       
       // If config changed since last successful test, mark it for retest
@@ -30,21 +35,7 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
         updatedStatus = "needs_retest";
       }
 
-      const updatedIntegration = { ...parsed, status: updatedStatus, updatedAt: new Date().toISOString() };
-      
-      dispatch({ type: "UPDATE_INTEGRATION", payload: updatedIntegration });
-      dispatch({
-        type: "ADD_ACTIVITY",
-        payload: {
-          id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-          integrationId: parsed.id,
-          campaignId: parsed.campaignId,
-          eventType: "updated",
-          message: "Integration updated via Raw JSON Editor.",
-          createdAt: new Date().toISOString(),
-          actor: "User"
-        }
-      });
+      actions.updateIntegration(integration.id, { ...parsed, status: updatedStatus }, { message: "Integration updated via Raw JSON Editor." });
 
       setError(null);
       setIsSaved(true);
@@ -63,6 +54,25 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
     setError(null);
   };
 
+  const handleFormat = () => {
+    try {
+      setJsonText(JSON.stringify(JSON.parse(jsonText), null, 2));
+      setError(null);
+    } catch {
+      setError("Invalid JSON syntax");
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(jsonText);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 1500);
+    } catch {
+      setError("Could not copy JSON to clipboard");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -71,6 +81,12 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
           <p className="text-xs text-slate-500">Edit the normalized integration object directly. Changes to config may require re-testing.</p>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={handleFormat}
+            className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1"
+          >
+            <Code size={14} /> Format JSON
+          </button>
           <button 
             onClick={handleReset}
             className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1"
@@ -101,7 +117,7 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
           spellCheck={false}
         />
         <button 
-          onClick={() => navigator.clipboard.writeText(jsonText)}
+          onClick={handleCopy}
           className="absolute top-4 right-4 p-2 bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors"
           title="Copy to clipboard"
         >
@@ -113,3 +129,19 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
 };
 
 export default RawJsonEditor;
+
+const directions: IntegrationDirection[] = ["publisher", "buyer"];
+const types: IntegrationType[] = ["static_number", "rtb", "sip", "webhook", "generic_api"];
+const statuses: IntegrationStatus[] = ["draft", "needs_testing", "test_passed", "active", "active_unused", "dormant", "stale", "needs_retest", "failing", "paused", "archived"];
+
+function assertIntegration(value: unknown): asserts value is Integration {
+  if (!value || typeof value !== "object") throw new Error("Invalid schema: expected object");
+  const candidate = value as Partial<Integration>;
+  const required: Array<keyof Integration> = ["id", "campaignId", "name", "direction", "type", "platformPreset", "status", "config", "createdAt", "createdBy", "updatedAt", "updatedBy", "usageCount", "errorRate"];
+  const missing = required.find(field => candidate[field] === undefined || candidate[field] === "");
+  if (missing) throw new Error(`Invalid schema: missing '${missing}'`);
+  if (!directions.includes(candidate.direction as IntegrationDirection)) throw new Error("Invalid schema: bad direction");
+  if (!types.includes(candidate.type as IntegrationType)) throw new Error("Invalid schema: bad type");
+  if (!statuses.includes(candidate.status as IntegrationStatus)) throw new Error("Invalid schema: bad status");
+  if (typeof candidate.config !== "object" || candidate.config === null) throw new Error("Invalid schema: config must be an object");
+}

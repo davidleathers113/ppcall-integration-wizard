@@ -1,6 +1,8 @@
 import type { IntegrationDirection, IntegrationType, IntegrationStatus, Integration, IntegrationConfig } from "../models/appTypes";
 import { PRESETS } from "../data/mockData";
 
+type CampaignLookup = string | { id: string; name: string };
+
 export interface ValidationResult {
   row: number;
   name: string;
@@ -29,8 +31,9 @@ export function parseCSVLine(line: string): string[] {
   return result;
 }
 
-export function validateImports(content: string, type: "csv" | "json", existingCampaigns: string[]): ValidationResult[] {
+export function validateImports(content: string, type: "csv" | "json", existingCampaigns: CampaignLookup[]): ValidationResult[] {
   const results: ValidationResult[] = [];
+  const seenNames = new Set<string>();
   
   if (type === "csv") {
     const lines = content.split('\n').filter(l => l.trim().length > 0);
@@ -48,7 +51,7 @@ export function validateImports(content: string, type: "csv" | "json", existingC
       const record: Record<string, string> = {};
       headers.forEach((h, idx) => record[h] = vals[idx]);
       
-      validateRow(record, i, existingCampaigns, results);
+      validateRow(record, i, existingCampaigns, results, seenNames);
     }
   } else {
     try {
@@ -57,8 +60,8 @@ export function validateImports(content: string, type: "csv" | "json", existingC
         return [{ row: 0, name: "JSON", status: "error", message: "JSON must be an array of objects" }];
       }
       
-      parsed.forEach((item: Record<string, string>, index) => {
-        validateRow(item, index + 1, existingCampaigns, results);
+      parsed.forEach((item: Record<string, unknown>, index) => {
+        validateRow(normalizeRecord(item), index + 1, existingCampaigns, results, seenNames);
       });
     } catch {
       return [{ row: 0, name: "JSON", status: "error", message: "Invalid JSON format" }];
@@ -68,14 +71,14 @@ export function validateImports(content: string, type: "csv" | "json", existingC
   return results;
 }
 
-function validateRow(record: Record<string, string>, rowIndex: number, existingCampaigns: string[], results: ValidationResult[]) {
-  const name = record.integration_name || record.name || `Row ${rowIndex}`;
+function validateRow(record: Record<string, string>, rowIndex: number, existingCampaigns: CampaignLookup[], results: ValidationResult[], seenNames: Set<string>) {
+  const name = record.integration_name || record.name;
   const direction = (record.direction || "").toLowerCase() as IntegrationDirection;
   const integrationType = (record.type || "").toLowerCase() as IntegrationType;
-  const campaign = record.campaign || record.campaign_id;
+  const campaign = resolveCampaign(record.campaign || record.campaign_id, existingCampaigns);
   
   if (!name) {
-    results.push({ row: rowIndex, name, status: "error", message: "Missing required field: integration_name" });
+    results.push({ row: rowIndex, name: `Row ${rowIndex}`, status: "error", message: "Missing required field: integration_name" });
     return;
   }
   
@@ -97,6 +100,12 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
   let status: "ready" | "warning" | "error" = "ready";
   let message = "Ready to import";
 
+  if (seenNames.has(name)) {
+    status = "warning";
+    message = "Duplicate integration name in import file";
+  }
+  seenNames.add(name);
+
   const timeout = record.timeout_seconds || record.timeout;
   let parsedTimeout = 3;
   if (!timeout) {
@@ -114,6 +123,10 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
       status = "error";
       message = "Buyer API integrations require an endpoint URL";
     }
+  }
+  if (direction === "buyer" && integrationType === "static_number" && !record.destination_number) {
+    status = "error";
+    message = "Static buyer integrations require destination_number";
   }
 
   const preset = record.platform_preset || record.preset;
@@ -157,4 +170,17 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
 
 function isHttpMethod(value: string): value is NonNullable<IntegrationConfig["method"]> {
   return value === "GET" || value === "POST";
+}
+
+function normalizeRecord(item: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(Object.entries(item).map(([key, value]) => [key, value === undefined || value === null ? "" : String(value)]));
+}
+
+function resolveCampaign(value: string, existingCampaigns: CampaignLookup[]): string {
+  const normalized = value.trim().toLowerCase();
+  const match = existingCampaigns.find(campaign => {
+    if (typeof campaign === "string") return campaign.toLowerCase() === normalized;
+    return campaign.id.toLowerCase() === normalized || campaign.name.toLowerCase() === normalized;
+  });
+  return typeof match === "string" ? match : match?.id || "";
 }

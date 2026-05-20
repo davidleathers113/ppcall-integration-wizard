@@ -1,114 +1,15 @@
-import React, { createContext, useReducer, useContext, useEffect } from 'react';
-import type { ReactNode } from 'react';
-import type { Campaign, Integration, TestRun, ActivityEvent } from '../models/appTypes';
-import { MOCK_CAMPAIGNS, MOCK_INTEGRATIONS, MOCK_ACTIVITY } from '../data/mockData';
+import React, { createContext, useContext, useEffect, useReducer, useRef } from "react";
+import type { ReactNode } from "react";
+import { appReducer, createInitialState, type AppAction, type AppState } from "./appReducer";
 
-// --- State Definition ---
-export interface AppState {
-  campaigns: Campaign[];
-  integrations: Integration[];
-  testRuns: TestRun[];
-  activityEvents: ActivityEvent[];
+export const STORAGE_KEY = "ppcall_studio_state";
+export const STORAGE_VERSION = 2;
+
+interface PersistedState {
+  version: number;
+  state: AppState;
 }
 
-const initialState: AppState = {
-  campaigns: MOCK_CAMPAIGNS,
-  integrations: MOCK_INTEGRATIONS,
-  testRuns: [],
-  activityEvents: MOCK_ACTIVITY,
-};
-
-// --- Actions Definition ---
-export type AppAction =
-  | { type: 'CREATE_CAMPAIGN'; payload: Campaign }
-  | { type: 'UPDATE_CAMPAIGN'; payload: Campaign }
-  | { type: 'CREATE_INTEGRATION'; payload: Integration }
-  | { type: 'UPDATE_INTEGRATION'; payload: Integration }
-  | { type: 'RUN_TEST'; payload: { integrationId: string; testRun: TestRun } }
-  | { type: 'ACTIVATE_INTEGRATION'; payload: string }
-  | { type: 'PAUSE_INTEGRATION'; payload: string }
-  | { type: 'ARCHIVE_INTEGRATION'; payload: string }
-  | { type: 'BULK_IMPORT'; payload: Integration[] }
-  | { type: 'MARK_USED'; payload: string }
-  | { type: 'ADD_ACTIVITY'; payload: ActivityEvent }
-  | { type: 'RESET_DATA' }
-  | { type: 'HYDRATE'; payload: AppState };
-
-// --- Reducer ---
-function appReducer(state: AppState, action: AppAction): AppState {
-  switch (action.type) {
-    case 'CREATE_CAMPAIGN':
-      return { ...state, campaigns: [...state.campaigns, action.payload] };
-    case 'UPDATE_CAMPAIGN':
-      return {
-        ...state,
-        campaigns: state.campaigns.map(c => c.id === action.payload.id ? action.payload : c)
-      };
-    case 'CREATE_INTEGRATION':
-      return { ...state, integrations: [...state.integrations, action.payload] };
-    case 'UPDATE_INTEGRATION':
-      return {
-        ...state,
-        integrations: state.integrations.map(i => i.id === action.payload.id ? action.payload : i)
-      };
-    case 'RUN_TEST':
-      return {
-        ...state,
-        testRuns: [...state.testRuns, action.payload.testRun],
-        integrations: state.integrations.map(i => {
-          if (i.id === action.payload.integrationId) {
-            return {
-              ...i,
-              lastTestedAt: new Date().toISOString(),
-              lastSuccessfulTestAt: action.payload.testRun.status === 'passed' ? new Date().toISOString() : i.lastSuccessfulTestAt,
-              status: action.payload.testRun.status === 'passed' ? (i.status === 'active' ? 'active' : 'test_passed') : 'failing'
-            };
-          }
-          return i;
-        })
-      };
-    case 'ACTIVATE_INTEGRATION':
-      return {
-        ...state,
-        integrations: state.integrations.map(i => 
-          i.id === action.payload ? { ...i, status: 'active', activatedAt: new Date().toISOString() } : i
-        )
-      };
-    case 'PAUSE_INTEGRATION':
-      return {
-        ...state,
-        integrations: state.integrations.map(i => 
-          i.id === action.payload ? { ...i, status: 'paused' } : i
-        )
-      };
-    case 'ARCHIVE_INTEGRATION':
-      return {
-        ...state,
-        integrations: state.integrations.map(i => 
-          i.id === action.payload ? { ...i, status: 'archived' } : i
-        )
-      };
-    case 'BULK_IMPORT':
-      return { ...state, integrations: [...state.integrations, ...action.payload] };
-    case 'MARK_USED':
-      return {
-        ...state,
-        integrations: state.integrations.map(i => 
-          i.id === action.payload ? { ...i, usageCount: i.usageCount + 1, lastUsedAt: new Date().toISOString() } : i
-        )
-      };
-    case 'ADD_ACTIVITY':
-      return { ...state, activityEvents: [action.payload, ...state.activityEvents] };
-    case 'RESET_DATA':
-      return initialState;
-    case 'HYDRATE':
-      return action.payload;
-    default:
-      return state;
-  }
-}
-
-// --- Context ---
 interface AppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
@@ -116,28 +17,39 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// --- Provider ---
-export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(appReducer, initialState);
+function readPersistedState(): AppState {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return createInitialState();
 
-  // Load from local storage
-  useEffect(() => {
-    const saved = localStorage.getItem('ppcall_studio_state');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.campaigns) {
-          dispatch({ type: 'HYDRATE', payload: parsed });
-        }
-      } catch (e) {
-        console.error("Failed to parse state from localStorage", e);
-      }
+  try {
+    const parsed = JSON.parse(saved) as Partial<PersistedState> | AppState;
+    if ("version" in parsed && parsed.version === STORAGE_VERSION && parsed.state) {
+      return parsed.state;
     }
-  }, []);
+    return createInitialState();
+  } catch (error) {
+    console.error("Failed to parse state from localStorage", error);
+    return createInitialState();
+  }
+}
 
-  // Save to local storage
+export const AppProvider = ({ children }: { children: ReactNode }) => {
+  const hydratedRef = useRef(false);
+  const [state, dispatch] = useReducer(appReducer, undefined, () => {
+    if (typeof localStorage === "undefined") return createInitialState();
+    return readPersistedState();
+  });
+
   useEffect(() => {
-    localStorage.setItem('ppcall_studio_state', JSON.stringify(state));
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+    }
+
+    const persisted: PersistedState = {
+      version: STORAGE_VERSION,
+      state
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
   }, [state]);
 
   return (
@@ -147,24 +59,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// --- Custom Hook ---
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAppContext = () => {
   const context = useContext(AppContext);
   if (context === undefined) {
-    throw new Error('useAppContext must be used within an AppProvider');
+    throw new Error("useAppContext must be used within an AppProvider");
   }
   return context;
 };
 
-// --- Helper Functions to create activity easily ---
-// eslint-disable-next-line react-refresh/only-export-components
-export const createActivity = (integrationId: string, campaignId: string, eventType: ActivityEvent['eventType'], message: string, actor: string = "User"): ActivityEvent => ({
-  id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-  integrationId,
-  campaignId,
-  eventType,
-  message,
-  createdAt: new Date().toISOString(),
-  actor
-});
+export type { AppAction, AppState };

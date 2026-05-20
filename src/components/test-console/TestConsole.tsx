@@ -3,7 +3,8 @@ import { Play, Terminal, CheckCircle2, XCircle, Info, ChevronRight, ChevronDown,
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
-import { simulateIntegrationTest } from "../../utils/testSimulation";
+import { useAppActions } from "../../store/useAppActions";
+import { DEFAULT_TOKENS } from "../../utils/tokenResolver";
 import type { TestRun } from "../../models/appTypes";
 
 interface TestConsoleProps {
@@ -11,13 +12,15 @@ interface TestConsoleProps {
 }
 
 const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
-  const { state, dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
   const initialIntegrationId = overrideIntegrationId || (state.integrations.length > 0 ? state.integrations[0].id : "");
   
   const [selectedIntId, setSelectedIntId] = useState(initialIntegrationId);
   const [testRun, setTestRun] = useState<TestRun | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>("checklist");
+  const [inputTokens, setInputTokens] = useState(DEFAULT_TOKENS);
 
   const selectedIntegration = state.integrations.find(i => i.id === selectedIntId);
 
@@ -26,24 +29,9 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
     setIsRunning(true);
     
     setTimeout(() => {
-      const result = simulateIntegrationTest(selectedIntegration);
+      const result = actions.runIntegrationTest(selectedIntegration.id, inputTokens);
+      if (!result) return;
       setTestRun(result);
-      
-      // Dispatch test run to store
-      dispatch({ type: "RUN_TEST", payload: { integrationId: selectedIntegration.id, testRun: result } });
-      dispatch({
-        type: "ADD_ACTIVITY",
-        payload: {
-          id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-          integrationId: selectedIntegration.id,
-          campaignId: selectedIntegration.campaignId,
-          eventType: "tested",
-          message: `Integration test ${result.status} in ${result.responseTimeMs}ms.`,
-          createdAt: new Date().toISOString(),
-          actor: "System"
-        }
-      });
-      
       setIsRunning(false);
     }, 1000);
   };
@@ -102,6 +90,21 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
               </button>
             }
           >
+            <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-800">
+              This is a simulated test. No external endpoint is called.
+            </div>
+            <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+              {["caller_id", "zip", "state", "publisher_id", "campaign_id", "trusted_form", "jornaya"].map(token => (
+                <label key={token} className="text-[10px] font-bold text-slate-500 uppercase">
+                  {token}
+                  <input
+                    className="mt-1 w-full p-2 border rounded text-xs font-mono normal-case"
+                    value={inputTokens[token] || ""}
+                    onChange={(event) => setInputTokens(current => ({ ...current, [token]: event.target.value }))}
+                  />
+                </label>
+              ))}
+            </div>
             {!testRun && !isRunning ? (
               <div className="py-20 text-center space-y-4">
                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
@@ -121,6 +124,16 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
               </div>
             ) : (
               <div className="space-y-6">
+                {testRun?.checklist.some(item => item.status === "fail") && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-100">
+                    <p className="text-sm font-bold text-red-900">Failed Checks</p>
+                    <ul className="mt-2 space-y-1 text-xs text-red-700">
+                      {testRun?.checklist.filter(item => item.status === "fail").map(item => (
+                        <li key={item.label}>{item.label}: {item.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div className={`p-4 rounded-xl border flex items-center justify-between ${testRun?.status === "passed" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                   <div className="flex items-center gap-3">
                     {testRun?.status === "passed" ? (

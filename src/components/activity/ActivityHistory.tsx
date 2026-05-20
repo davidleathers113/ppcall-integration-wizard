@@ -1,9 +1,10 @@
 import React from "react";
 import { User, Cpu, AlertCircle, Zap, ShieldCheck } from "lucide-react";
 import Card from "../shared/Card";
-import { MOCK_ACTIVITY } from "../../data/mockData";
+import { useAppContext } from "../../store/AppStore";
 
 const ActivityHistory: React.FC = () => {
+  const { state } = useAppContext();
   const getEventIcon = (type: string) => {
     switch (type) {
       case "created": return <PlusCircleIcon className="text-blue-500" size={16} />;
@@ -24,7 +25,7 @@ const ActivityHistory: React.FC = () => {
 
       <Card>
         <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-slate-100 before:pointer-events-none">
-          {MOCK_ACTIVITY.map((event) => (
+          {state.activityEvents.map((event) => (
             <div key={event.id} className="relative flex items-center justify-between group">
               <div className="flex items-center">
                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white border-2 border-slate-100 text-slate-500 shadow-sm z-10 transition-colors group-hover:border-purple-200">

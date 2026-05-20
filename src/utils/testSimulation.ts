@@ -1,6 +1,7 @@
 import type { Integration, TestRun, TestChecklistItem } from "../models/appTypes";
 import { resolveObjectTokens, DEFAULT_TOKENS } from "./tokenResolver";
 import { extractJsonPath } from "./jsonPath";
+import { createId } from "./id";
 
 export function simulateIntegrationTest(integration: Integration, inputTokens: Record<string, string> = DEFAULT_TOKENS): TestRun {
   const isBuyer = integration.direction === "buyer";
@@ -225,7 +226,7 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
   };
 
   return {
-    id: `test_${Math.random().toString(36).substr(2, 9)}`,
+    id: createId("test"),
     integrationId: integration.id,
     status,
     requestPreview,

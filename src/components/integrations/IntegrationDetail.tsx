@@ -9,12 +9,15 @@ import {
   Activity,
   Pause,
   Archive,
-  Play
+  Play,
+  Gauge
 } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
-import { calculateFreshnessStatus, getDaysSince } from "../../utils/freshness";
-import { createActivity, useAppContext } from "../../store/AppStore";
+import { calculateFreshnessStatus, getDaysSince, getFreshnessDetails } from "../../utils/freshness";
+import { useAppContext } from "../../store/AppStore";
+import { useAppActions } from "../../store/useAppActions";
+import { selectActivityForIntegration, selectLatestTestRunForIntegration } from "../../store/selectors";
 import BuyerConfigForm from "./BuyerConfigForm";
 import RawJsonEditor from "./RawJsonEditor";
 import PublisherInstructions from "./PublisherInstructions";
@@ -26,7 +29,8 @@ interface IntegrationDetailProps {
 }
 
 const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, onBack }) => {
-  const { state, dispatch } = useAppContext();
+  const { state } = useAppContext();
+  const actions = useAppActions();
   const [activeTab, setActiveTab] = useState("overview");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -36,42 +40,29 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
 
   const currentStatus = calculateFreshnessStatus(integration);
   const isPublisher = integration.direction === "publisher";
-  const latestTestRun = state.testRuns
-    .filter(testRun => testRun.integrationId === integration.id)
-    .toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-
-  const addActivity = (eventType: "activated" | "paused" | "archived", message: string) => {
-    dispatch({
-      type: "ADD_ACTIVITY",
-      payload: createActivity(integration.id, integration.campaignId, eventType, message)
-    });
-  };
+  const freshness = getFreshnessDetails(integration);
+  const latestTestRun = selectLatestTestRunForIntegration(state, integration.id);
+  const integrationActivity = selectActivityForIntegration(state, integrationId);
+  const failedChecklistItems = latestTestRun?.checklist.filter(item => item.status === "fail") || [];
 
   const handleActivate = () => {
-    if (latestTestRun?.status !== "passed") {
-      setActionMessage("Activation blocked: run and pass a stored integration test first.");
-      return;
-    }
-
-    dispatch({ type: "ACTIVATE_INTEGRATION", payload: integration.id });
-    addActivity("activated", `Activated ${integration.name}.`);
-    setActionMessage("Integration activated.");
+    const result = actions.activateIntegration(integration.id);
+    setActionMessage(result.message);
   };
 
   const handlePause = () => {
-    dispatch({ type: "PAUSE_INTEGRATION", payload: integration.id });
-    addActivity("paused", `Paused ${integration.name}.`);
+    actions.pauseIntegration(integration.id);
     setActionMessage("Integration paused.");
   };
 
   const handleArchive = () => {
-    dispatch({ type: "ARCHIVE_INTEGRATION", payload: integration.id });
-    addActivity("archived", `Archived ${integration.name}.`);
+    actions.archiveIntegration(integration.id);
     setActionMessage("Integration archived.");
   };
 
   const tabs = [
     { id: "overview", label: "Overview", icon: Activity },
+    { id: "freshness", label: "Freshness", icon: Gauge },
     { id: "configure", label: "Configure", icon: Settings },
     { id: "raw-json", label: "Raw JSON", icon: Code },
     { id: "test", label: "Test Console", icon: Terminal },
@@ -153,6 +144,41 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
             )}
           </Card>
         );
+      case "freshness":
+        return (
+          <Card title="Freshness">
+            <div className="space-y-4">
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-sm text-slate-500">Persisted Status</span>
+                <Badge variant={integration.status}>{integration.status}</Badge>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-2">
+                <span className="text-sm text-slate-500">Computed Freshness</span>
+                <Badge variant={freshness.status}>{freshness.status}</Badge>
+              </div>
+              <p className="text-sm text-slate-700"><strong>Reason:</strong> {freshness.reason}</p>
+              <p className="text-sm text-slate-700"><strong>Recommended action:</strong> {freshness.recommendedAction}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className="p-3 bg-slate-50 rounded-lg">Days since last use: <strong>{freshness.daysSinceLastUse ?? "Never"}</strong></div>
+                <div className="p-3 bg-slate-50 rounded-lg">Days since successful test: <strong>{freshness.daysSinceLastSuccessfulTest ?? "Never"}</strong></div>
+                <div className="p-3 bg-slate-50 rounded-lg">Edited after test: <strong>{freshness.editedAfterLastSuccessfulTest ? "Yes" : "No"}</strong></div>
+              </div>
+              <div className="p-3 border border-slate-100 rounded-lg">
+                <p className="text-sm font-semibold text-slate-900">Latest Test</p>
+                <p className="text-xs text-slate-500">{latestTestRun ? `${latestTestRun.status} at ${new Date(latestTestRun.createdAt).toLocaleString()}` : "No stored test run."}</p>
+                {failedChecklistItems.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-xs text-red-700">
+                    {failedChecklistItems.slice(0, 3).map(item => <li key={item.label}>{item.label}: {item.message}</li>)}
+                  </ul>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setActiveTab("test")} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-bold">Run Test</button>
+                <button onClick={() => actions.markIntegrationUsed(integration.id)} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold">Mark Used</button>
+              </div>
+            </div>
+          </Card>
+        );
       case "raw-json":
         return <RawJsonEditor integration={integration} />;
       case "test":
@@ -168,7 +194,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
         return (
           <Card>
             <div className="space-y-4">
-              {state.activityEvents.filter(e => e.integrationId === integrationId).map(event => (
+              {integrationActivity.map(event => (
                 <div key={event.id} className="p-4 border border-slate-100 rounded-lg flex items-center justify-between">
                   <div>
                     <p className="text-sm text-slate-900 font-medium">{event.message}</p>
@@ -177,7 +203,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
                   <Badge variant="outline">{event.eventType}</Badge>
                 </div>
               ))}
-              {state.activityEvents.filter(e => e.integrationId === integrationId).length === 0 && (
+              {integrationActivity.length === 0 && (
                 <div className="text-center text-slate-500 text-sm py-4">No activity recorded yet.</div>
               )}
             </div>
@@ -210,6 +236,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
           <button
             onClick={handleActivate}
             disabled={integration.status === "active" || integration.status === "archived"}
+            title={latestTestRun?.status === "passed" ? "Activate integration" : "Run and pass a stored test before activation."}
             className="px-3 py-2 text-xs font-bold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-200 disabled:text-slate-500 flex items-center gap-1"
           >
             <Play size={14} /> Activate
