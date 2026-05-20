@@ -1,4 +1,7 @@
 import type {
+  BuyerDestinationKind,
+  CallHandlingConfig,
+  CapUsage,
   DestinationConfig,
   DestinationMode,
   DialIvrSettings,
@@ -7,9 +10,11 @@ import type {
   FilterRule,
   Integration,
   IntegrationConfig,
+  PredictiveRoutingConfig,
   RecordingSettings,
   RequestConfig,
   RevenueSettings,
+  ShareableTagsConfig,
 } from "../models/appTypes";
 
 export function inferDestinationMode(
@@ -101,6 +106,50 @@ export function inferFilters(config: IntegrationConfig): FilterRule[] {
 
 export function inferDialIvr(config: IntegrationConfig): DialIvrSettings {
   return config.dialIvr ?? { enabled: false };
+}
+
+export function inferBuyerDestinationKind(
+  integration: Pick<Integration, "type" | "config" | "direction">
+): BuyerDestinationKind {
+  if (integration.direction !== "buyer") {
+    return integration.config.buyerDestinationKind ?? "generic_api";
+  }
+  if (integration.config.buyerDestinationKind) return integration.config.buyerDestinationKind;
+  if (integration.type === "static_number") return "direct_number";
+  if (integration.type === "sip") return "direct_sip";
+  if (integration.type === "rtb") return "rtb";
+  if (integration.type === "webhook") return "webhook";
+  return "generic_api";
+}
+
+export function isDirectTargetKind(kind: BuyerDestinationKind): boolean {
+  return kind === "direct_number" || kind === "direct_sip";
+}
+
+export function inferCallHandling(config: IntegrationConfig): CallHandlingConfig {
+  return (
+    config.callHandling ?? {
+      connectionTimeoutSeconds: 30,
+      revenueRecovery: "buyer_default",
+    }
+  );
+}
+
+export function inferCapUsage(config: IntegrationConfig): CapUsage {
+  return config.capUsage ?? {};
+}
+
+export function inferShareableTags(config: IntegrationConfig): ShareableTagsConfig {
+  return config.shareableTags ?? { mode: "buyer_default" };
+}
+
+export function inferPredictiveRouting(config: IntegrationConfig): PredictiveRoutingConfig {
+  return (
+    config.predictiveRouting ?? {
+      mode: "campaign_default",
+      priorityBump: 0,
+    }
+  );
 }
 
 export const FILTER_FIELDS = [

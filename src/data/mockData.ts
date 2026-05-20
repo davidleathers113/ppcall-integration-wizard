@@ -107,6 +107,95 @@ export const PRESETS: Record<string, { name: string; config: IntegrationConfig }
       payout: 30,
       conversionDurationSeconds: 120
     }
+  },
+  direct_number: {
+    name: "Direct Number Target",
+    config: {
+      buyerDestinationKind: "direct_number",
+      destinationMode: "static_number",
+      destination: {
+        number: "+18005551212"
+      },
+      destinationNumber: "+18005551212",
+      callHandling: {
+        connectionTimeoutSeconds: 30,
+        revenueRecovery: "buyer_default"
+      },
+      dialIvr: {
+        enabled: false,
+        digits: ""
+      },
+      recordingSettings: { mode: "account_default" },
+      schedule: {
+        timezone: "America/New_York",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        startTime: "00:00",
+        endTime: "23:59",
+        mode: "always_open"
+      },
+      caps: {
+        capOn: "converted_calls",
+        daily: 100,
+        concurrency: 5
+      },
+      capUsage: {
+        dailyUsed: 0,
+        currentConcurrency: 0
+      },
+      duplicateRules: { mode: "buyer_default" },
+      shareableTags: { mode: "buyer_default" },
+      predictiveRouting: {
+        mode: "campaign_default",
+        priorityBump: 0
+      },
+      payout: 35,
+      conversionDurationSeconds: 120
+    }
+  },
+  direct_sip: {
+    name: "Direct SIP Target",
+    config: {
+      buyerDestinationKind: "direct_sip",
+      destinationMode: "static_sip",
+      destination: {
+        sipAddress: "sip:buyer@example.com",
+        sipHeaders: {}
+      },
+      sipAddress: "sip:buyer@example.com",
+      callHandling: {
+        connectionTimeoutSeconds: 30,
+        revenueRecovery: "buyer_default"
+      },
+      dialIvr: {
+        enabled: false,
+        digits: ""
+      },
+      recordingSettings: { mode: "account_default" },
+      schedule: {
+        timezone: "America/New_York",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        startTime: "00:00",
+        endTime: "23:59",
+        mode: "always_open"
+      },
+      caps: {
+        capOn: "converted_calls",
+        daily: 100,
+        concurrency: 5
+      },
+      capUsage: {
+        dailyUsed: 0,
+        currentConcurrency: 0
+      },
+      duplicateRules: { mode: "buyer_default" },
+      shareableTags: { mode: "buyer_default" },
+      predictiveRouting: {
+        mode: "campaign_default",
+        priorityBump: 0
+      },
+      payout: 35,
+      conversionDurationSeconds: 120
+    }
   }
 };
 

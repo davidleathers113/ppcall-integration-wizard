@@ -63,8 +63,46 @@ export type DestinationMode =
 export interface DestinationConfig {
   number?: string;
   sipAddress?: string;
+  sipHeaders?: Record<string, string>;
   dynamicNumberPath?: string;
   dynamicSipPath?: string;
+}
+
+export type BuyerDestinationKind =
+  | "direct_number"
+  | "direct_sip"
+  | "rtb"
+  | "webhook"
+  | "generic_api";
+
+export type RevenueRecoveryMode = "buyer_default" | "enabled" | "disabled";
+
+export interface CallHandlingConfig {
+  connectionTimeoutSeconds?: number;
+  revenueRecovery?: RevenueRecoveryMode;
+}
+
+export interface CapUsage {
+  globalUsed?: number;
+  monthlyUsed?: number;
+  dailyUsed?: number;
+  hourlyUsed?: number;
+  currentConcurrency?: number;
+}
+
+export type ShareableTagsMode = "campaign_default" | "buyer_default" | "override";
+
+export interface ShareableTagsConfig {
+  mode: ShareableTagsMode;
+  shareInboundCallId?: boolean;
+  tags?: string[];
+}
+
+export type PredictiveRoutingMode = "campaign_default" | "estimated_revenue";
+
+export interface PredictiveRoutingConfig {
+  mode: PredictiveRoutingMode;
+  priorityBump?: number;
 }
 
 export type AuthenticationMode = "none" | "api_key" | "bearer_token" | "basic";
@@ -242,6 +280,11 @@ export interface IntegrationConfig {
   errorSettings?: ErrorSettings;
   filters?: FilterRule[];
   dialIvr?: DialIvrSettings;
+  buyerDestinationKind?: BuyerDestinationKind;
+  callHandling?: CallHandlingConfig;
+  capUsage?: CapUsage;
+  shareableTags?: ShareableTagsConfig;
+  predictiveRouting?: PredictiveRoutingConfig;
 }
 
 export interface Integration {
