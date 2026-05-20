@@ -1,0 +1,2 @@
+integration_name,campaign,direction,type,required_fields
+"Test, with comma",HVAC Inbound,buyer,rtb,"caller_id,zip,state"

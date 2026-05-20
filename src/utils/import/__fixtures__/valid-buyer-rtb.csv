@@ -1,0 +1,2 @@
+integration_name,campaign,direction,type,platform_preset,method,url,timeout_seconds,required_fields,accepted_path,accepted_value,destination_number_path,bid_path,conversion_duration_path,reject_reason_path
+Valid Buyer RTB,HVAC Inbound,buyer,rtb,generic_json_post,POST,https://buyer.example.com/rtb,3,"caller_id,zip,state",$.accepted,true,$.phone_number,$.payout,$.duration,$.reason
