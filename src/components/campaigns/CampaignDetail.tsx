@@ -6,19 +6,22 @@ import {
   Terminal, 
   Settings,
   ChevronLeft,
-  History
+  History,
+  PlusCircle
 } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { calculateFreshnessStatus } from "../../utils/freshness";
 import { useAppContext } from "../../store/AppStore";
+import type { IntegrationDirection } from "../../models/appTypes";
 
 interface CampaignDetailProps {
   campaignId: string;
   onBack: () => void;
+  onCreateIntegration: (context: { campaignId: string; direction?: IntegrationDirection }) => void;
 }
 
-const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) => {
+const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack, onCreateIntegration }) => {
   const { state } = useAppContext();
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -57,6 +60,12 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
                   <span className="text-sm text-slate-500">Integrations</span>
                   <span className="text-sm font-semibold">{integrations.length}</span>
                 </div>
+                <button
+                  onClick={() => onCreateIntegration({ campaignId })}
+                  className="w-full mt-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-700 flex items-center justify-center gap-2"
+                >
+                  <PlusCircle size={16} /> Add Integration
+                </button>
               </div>
             </Card>
             <Card title="Alerts">
@@ -77,8 +86,18 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
       case "publishers":
       case "buyers": {
         const list = activeTab === "publishers" ? publishers : buyers;
+        const direction: IntegrationDirection = activeTab === "publishers" ? "publisher" : "buyer";
         return (
           <div className="space-y-4">
+            <div className="flex justify-end">
+              <button
+                onClick={() => onCreateIntegration({ campaignId, direction })}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-700 flex items-center gap-2"
+              >
+                <PlusCircle size={16} />
+                Add {direction === "publisher" ? "Publisher" : "Buyer"}
+              </button>
+            </div>
             <Card className="p-0">
               <table className="w-full text-left">
                 <thead>
@@ -101,6 +120,11 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
                   ))}
                 </tbody>
               </table>
+              {list.length === 0 && (
+                <div className="p-8 text-center text-sm text-slate-500">
+                  No {activeTab} yet. Add one to start configuring this campaign.
+                </div>
+              )}
             </Card>
 
             {activeTab === "publishers" && publishers.length > 0 && (
