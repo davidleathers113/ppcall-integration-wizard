@@ -33,6 +33,16 @@ export type IntegrationStatus =
 export interface IntegrationCaps {
   daily?: number;
   hourly?: number;
+  capOn?: "connected_calls" | "converted_calls";
+  global?: number;
+  monthly?: number;
+  concurrency?: number;
+}
+
+export interface IntegrationScheduleBreak {
+  day?: string;
+  startTime: string;
+  endTime: string;
 }
 
 export interface IntegrationSchedule {
@@ -40,6 +50,118 @@ export interface IntegrationSchedule {
   days: string[];
   startTime: string;
   endTime: string;
+  mode?: "always_open" | "basic" | "advanced";
+  breaks?: IntegrationScheduleBreak[];
+}
+
+export type DestinationMode =
+  | "static_number"
+  | "static_sip"
+  | "dynamic_number_from_response"
+  | "dynamic_sip_from_response";
+
+export interface DestinationConfig {
+  number?: string;
+  sipAddress?: string;
+  dynamicNumberPath?: string;
+  dynamicSipPath?: string;
+}
+
+export type AuthenticationMode = "none" | "api_key" | "bearer_token" | "basic";
+export type RequestContentType =
+  | "application/json"
+  | "application/x-www-form-urlencoded"
+  | "text/plain";
+
+export interface RequestConfig {
+  method?: "GET" | "POST";
+  url?: string;
+  authenticationMode?: AuthenticationMode;
+  contentType?: RequestContentType;
+  headers?: Record<string, string>;
+  queryParams?: Record<string, string>;
+  body?: Record<string, unknown> | string;
+  timeoutSeconds?: number;
+}
+
+export interface ParsingStep {
+  id: string;
+  type:
+    | "json_path"
+    | "static_value"
+    | "normalize_phone"
+    | "number_parse"
+    | "text_contains";
+  value: string;
+}
+
+export interface ResponseParsingPipelines {
+  acceptance?: ParsingStep[];
+  destination?: ParsingStep[];
+  bid?: ParsingStep[];
+  duration?: ParsingStep[];
+  rejection?: ParsingStep[];
+}
+
+export type DuplicateRulesMode =
+  | "campaign_default"
+  | "buyer_default"
+  | "do_not_restrict"
+  | "restrict";
+
+export interface DuplicateRules {
+  mode: DuplicateRulesMode;
+  windowMinutes?: number;
+}
+
+export type RecordingMode = "account_default" | "enabled" | "disabled";
+
+export interface RecordingSettings {
+  mode: RecordingMode;
+}
+
+export type RevenueMode = "campaign_default" | "buyer_default" | "override";
+
+export interface RevenueSettings {
+  mode: RevenueMode;
+  payout?: number;
+  minimumRevenue?: number;
+  conversionDurationSeconds?: number;
+  dynamicBidPath?: string;
+  dynamicDurationPath?: string;
+}
+
+export type ErrorMode = "ring_tree_default" | "custom";
+export type ErrorFallbackBehavior =
+  | "continue_to_next_buyer"
+  | "stop_routing"
+  | "mark_failed";
+
+export interface ErrorSettings {
+  mode: ErrorMode;
+  fallbackBehavior?: ErrorFallbackBehavior;
+}
+
+export type FilterOperator =
+  | "equals"
+  | "not_equals"
+  | "in_list"
+  | "not_in_list"
+  | "exists"
+  | "does_not_exist";
+
+export interface FilterRule {
+  id: string;
+  group: "and" | "or";
+  field: string;
+  operator: FilterOperator;
+  value?: string;
+  values?: string[];
+}
+
+export interface DialIvrSettings {
+  enabled: boolean;
+  digits?: string;
 }
 
 export interface PublisherSource {
@@ -97,6 +219,7 @@ export interface IntegrationConfig {
     conversionDurationPath?: string;
     expiresInSecondsPath?: string;
     rejectReasonPath?: string;
+    pipelines?: ResponseParsingPipelines;
   };
   timeoutSeconds?: number;
   expiresInSeconds?: number;
@@ -110,6 +233,15 @@ export interface IntegrationConfig {
     strategy: "priority" | "weighted" | "round_robin" | "waterfall";
     fallbackTargetId?: string;
   };
+  destinationMode?: DestinationMode;
+  destination?: DestinationConfig;
+  request?: RequestConfig;
+  duplicateRules?: DuplicateRules;
+  recordingSettings?: RecordingSettings;
+  revenueSettings?: RevenueSettings;
+  errorSettings?: ErrorSettings;
+  filters?: FilterRule[];
+  dialIvr?: DialIvrSettings;
 }
 
 export interface Integration {

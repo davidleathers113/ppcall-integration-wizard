@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Check, Copy, Globe, Lock, RotateCcw } from "lucide-react";
 import Card from "../shared/Card";
 import { useAppActions } from "../../store/useAppActions";
+import { useToast } from "../shared/ToastProvider";
 
 const endpoints = [
   { method: "POST", path: "/api/campaigns", desc: "Create a mock campaign" },
@@ -83,6 +84,7 @@ const examples = {
 
 const DeveloperDocs: React.FC = () => {
   const actions = useAppActions();
+  const toast = useToast();
   const [copied, setCopied] = useState<string | null>(null);
   const [activeExample, setActiveExample] = useState<keyof typeof examples>("Buyer RTB");
   const [copyError, setCopyError] = useState<string | null>(null);
@@ -92,12 +94,19 @@ const DeveloperDocs: React.FC = () => {
       await navigator.clipboard.writeText(text);
       setCopied(id);
       setCopyError(null);
+      toast.success(`Copied ${id} payload.`);
       setTimeout(() => setCopied(null), 1500);
     } catch {
       setCopied(null);
       setCopyError("Copy failed. Browser clipboard access is unavailable.");
+      toast.error("Copy failed. Browser clipboard access is unavailable.");
       setTimeout(() => setCopyError(null), 3000);
     }
+  };
+
+  const handleReset = () => {
+    actions.resetMockData();
+    toast.info("Mock data reset to seed.");
   };
 
   const exampleText = JSON.stringify(examples[activeExample], null, 2);
@@ -110,7 +119,7 @@ const DeveloperDocs: React.FC = () => {
           <p className="text-slate-500">Mock API reference for the normalized campaign, integration, activity, and test-run model.</p>
           <p className="mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-2">These are prototype docs only. No real API server, telecom carrier, buyer endpoint, authentication, or billing system is connected.</p>
         </div>
-        <button onClick={() => actions.resetMockData()} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center gap-2">
+        <button data-testid="reset-mock-data-button" onClick={handleReset} className="px-3 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold flex items-center gap-2">
           <RotateCcw size={14} /> Reset Mock Data
         </button>
       </header>

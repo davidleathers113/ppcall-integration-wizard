@@ -5,6 +5,7 @@ import { PRESETS } from "../../data/mockData";
 import type { IntegrationConfig, IntegrationDirection, IntegrationType } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { useToast } from "../shared/ToastProvider";
 import { createId } from "../../utils/id";
 
 interface AddIntegrationWizardProps {
@@ -20,6 +21,7 @@ const steps = ["Direction", "Type", "Basics", "Preset", "Configure", "Parsing", 
 const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete, initialContext }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
   const hasInitialCampaign = Boolean(initialContext?.campaignId);
   const hasInitialDirection = Boolean(initialContext?.direction);
   const [step, setStep] = useState(hasInitialCampaign && hasInitialDirection ? 2 : hasInitialDirection ? 2 : 1);
@@ -106,6 +108,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
     });
     setSavedIntegrationId(integration.id);
     setMessage("Draft created. Run a test before activation.");
+    toast.success(`Draft integration "${integration.name}" created.`);
     setStep(9);
   };
 
@@ -143,7 +146,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
               ].map(item => {
                 const Icon = item.icon;
                 return (
-                  <button key={item.id} onClick={() => setDirection(item.id as IntegrationDirection)} className={`p-6 border-2 rounded-xl text-left transition-all ${direction === item.id ? "border-purple-600 bg-purple-50" : "border-slate-100 hover:border-purple-300"}`}>
+                  <button data-testid={`wizard-direction-${item.id}`} key={item.id} onClick={() => setDirection(item.id as IntegrationDirection)} className={`p-6 border-2 rounded-xl text-left transition-all ${direction === item.id ? "border-purple-600 bg-purple-50" : "border-slate-100 hover:border-purple-300"}`}>
                     <Icon size={24} className="text-purple-600 mb-4" />
                     <h4 className="font-bold text-slate-900">{item.title}</h4>
                     <p className="text-sm text-slate-500 mt-1">{item.desc}</p>
@@ -159,15 +162,15 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             <h3 className="text-lg font-semibold text-center">Choose Integration Type</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {[
-                { id: "static_number", label: "Static Number", icon: Phone },
-                { id: "rtb", label: "RTB / Ping-Post", icon: Zap },
-                { id: "sip", label: "SIP Trunking", icon: Globe },
-                { id: "webhook", label: "Webhook", icon: Link },
-                { id: "generic_api", label: "Generic API", icon: Terminal },
+                { id: "static_number", testId: "static-number", label: "Static Number", icon: Phone },
+                { id: "rtb", testId: "rtb", label: "RTB / Ping-Post", icon: Zap },
+                { id: "sip", testId: "sip", label: "SIP Trunking", icon: Globe },
+                { id: "webhook", testId: "webhook", label: "Webhook", icon: Link },
+                { id: "generic_api", testId: "generic-api", label: "Generic API", icon: Terminal },
               ].map(item => {
                 const Icon = item.icon;
                 return (
-                  <button key={item.id} onClick={() => setType(item.id as IntegrationType)} className={`p-4 border rounded-lg text-center transition-all ${type === item.id ? "border-purple-600 bg-purple-50" : "border-slate-200 hover:border-purple-300"}`}>
+                  <button data-testid={`wizard-type-${item.testId}`} key={item.id} onClick={() => setType(item.id as IntegrationType)} className={`p-4 border rounded-lg text-center transition-all ${type === item.id ? "border-purple-600 bg-purple-50" : "border-slate-200 hover:border-purple-300"}`}>
                     <Icon size={24} className="mx-auto text-slate-500 mb-2" />
                     <span className="text-sm font-medium text-slate-700">{item.label}</span>
                   </button>
@@ -202,12 +205,12 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-center">Select Platform Preset</h3>
             {presets.map(([key, preset]) => (
-              <button key={key} onClick={() => selectPreset(key)} className="w-full p-4 border border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50">
+              <button data-testid={`wizard-preset-${key.split('_').join('-')}`} key={key} onClick={() => selectPreset(key)} className="w-full p-4 border border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50">
                 <span className="font-medium text-slate-900">{preset.name}</span>
                 <ArrowRight size={16} className="text-slate-400" />
               </button>
             ))}
-            <button onClick={() => selectPreset("custom")} className="w-full p-4 border border-dashed border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50">
+            <button data-testid="wizard-preset-custom" onClick={() => selectPreset("custom")} className="w-full p-4 border border-dashed border-slate-200 rounded-lg flex items-center justify-between hover:bg-slate-50">
               <span className="font-medium text-slate-500 italic">Custom / Manual Setup</span>
               <Settings size={16} className="text-slate-400" />
             </button>
@@ -241,12 +244,12 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <label className="text-xs font-bold text-slate-500 uppercase">Method
-                    <select className="mt-1 w-full p-2 border rounded-lg text-sm bg-white" value={normalizedConfig.method || "POST"} onChange={event => updateConfig("method", event.target.value as IntegrationConfig["method"])}>
+                    <select data-testid="wizard-method-select" className="mt-1 w-full p-2 border rounded-lg text-sm bg-white" value={normalizedConfig.method || "POST"} onChange={event => updateConfig("method", event.target.value as IntegrationConfig["method"])}>
                       <option value="POST">POST</option>
                       <option value="GET">GET</option>
                     </select>
                   </label>
-                  <div className="md:col-span-2"><Field label="URL" value={normalizedConfig.url || ""} onChange={value => updateConfig("url", value)} /></div>
+                  <div className="md:col-span-2"><Field testId="wizard-url-input" label="URL" value={normalizedConfig.url || ""} onChange={value => updateConfig("url", value)} /></div>
                 </div>
                 <NumberField label="Timeout Seconds" value={normalizedConfig.timeoutSeconds || 3} onChange={value => updateConfig("timeoutSeconds", value)} />
               </>
@@ -284,17 +287,17 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
             <ShieldCheck size={48} className="mx-auto text-green-600" />
             <h3 className="text-lg font-semibold">Save Draft</h3>
             <p className="text-sm text-slate-500">The draft will be saved as normalized JSON. It will not be activated until a stored test passes.</p>
-            <button data-testid="save-draft-button" onClick={saveDraft} disabled={!canContinue()} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-slate-200">Save Draft</button>
+            <button data-testid="wizard-save-draft-button" onClick={saveDraft} disabled={!canContinue()} className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 disabled:bg-slate-200">Save Draft</button>
           </div>
         );
       case 9:
         return (
-          <div className="space-y-6 text-center py-8">
+          <div data-testid="wizard-saved-step" className="space-y-6 text-center py-8">
             <ShieldCheck size={48} className="mx-auto text-green-600" />
             <h3 className="text-2xl font-bold text-slate-900">Draft Integration Saved</h3>
             <p className="text-slate-500">{message || "Draft created. Run a test before activation."}</p>
             <div className="flex gap-4 pt-4">
-              <button onClick={() => savedIntegrationId && onComplete?.(savedIntegrationId)} className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700">Open Detail</button>
+              <button data-testid="wizard-open-detail-button" onClick={() => savedIntegrationId && onComplete?.(savedIntegrationId)} className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700">Open Detail</button>
               <button onClick={() => onComplete?.("")} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-200">Back to Integrations</button>
             </div>
           </div>
@@ -393,10 +396,10 @@ function buildConfigWithDefaultChild(config: IntegrationConfig, direction: Integ
   return config;
 }
 
-const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => (
+const Field = ({ label, value, onChange, testId }: { label: string; value: string; onChange: (value: string) => void; testId?: string }) => (
   <label className="block text-xs font-bold text-slate-500 uppercase">
     {label}
-    <input className="mt-1 w-full p-2 border rounded-lg text-sm font-mono normal-case" value={value} onChange={event => onChange(event.target.value)} />
+    <input data-testid={testId} className="mt-1 w-full p-2 border rounded-lg text-sm font-mono normal-case" value={value} onChange={event => onChange(event.target.value)} />
   </label>
 );
 

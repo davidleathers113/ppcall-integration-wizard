@@ -4,6 +4,8 @@ import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { selectTestRunsForIntegration } from "../../store/selectors";
+import { useToast } from "../shared/ToastProvider";
 import { DEFAULT_TOKENS } from "../../utils/tokenResolver";
 import type { TestRun } from "../../models/appTypes";
 
@@ -14,6 +16,7 @@ interface TestConsoleProps {
 const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
   const initialIntegrationId = overrideIntegrationId || (state.integrations.length > 0 ? state.integrations[0].id : "");
   
   const [selectedIntId, setSelectedIntId] = useState(initialIntegrationId);
@@ -23,16 +26,25 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
   const [inputTokens, setInputTokens] = useState(DEFAULT_TOKENS);
 
   const selectedIntegration = state.integrations.find(i => i.id === selectedIntId);
+  const historyRuns = selectedIntId ? selectTestRunsForIntegration(state, selectedIntId) : [];
 
   const handleRunTest = () => {
     if (!selectedIntegration) return;
     setIsRunning(true);
-    
+
     setTimeout(() => {
       const result = actions.runIntegrationTest(selectedIntegration.id, inputTokens);
-      if (!result) return;
+      if (!result) {
+        setIsRunning(false);
+        return;
+      }
       setTestRun(result);
       setIsRunning(false);
+      if (result.status === "passed") {
+        toast.success(`Test passed for ${selectedIntegration.name}.`);
+      } else {
+        toast.error(`Test failed for ${selectedIntegration.name}.`);
+      }
     }, 1000);
   };
 
@@ -99,6 +111,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
                 <label key={token} className="text-[10px] font-bold text-slate-500 uppercase">
                   {token}
                   <input
+                    data-testid={`test-input-${token.split('_').join('-')}`}
                     className="mt-1 w-full p-2 border rounded text-xs font-mono normal-case"
                     value={inputTokens[token] || ""}
                     onChange={(event) => setInputTokens(current => ({ ...current, [token]: event.target.value }))}
@@ -135,7 +148,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
                     </ul>
                   </div>
                 )}
-                <div className={`p-4 rounded-xl border flex items-center justify-between ${testRun?.status === "passed" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                <div data-testid="test-result-status" data-status={testRun?.status || ""} className={`p-4 rounded-xl border flex items-center justify-between ${testRun?.status === "passed" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                   <div className="flex items-center gap-3">
                     {testRun?.status === "passed" ? (
                       <CheckCircle2 className="text-green-600" size={24} />
@@ -154,8 +167,8 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
 
                 <div className="space-y-4">
                   {/* Checklist Section */}
-                  <div className="border rounded-lg overflow-hidden">
-                    <button 
+                  <div data-testid="test-checklist" className="border rounded-lg overflow-hidden">
+                    <button
                       onClick={() => setExpandedSection(expandedSection === "checklist" ? null : "checklist")}
                       className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
                     >
@@ -199,6 +212,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
                   {/* Request Preview */}
                   <JsonSection
                     id="request"
+                    testId="test-request-preview"
                     title="Request Preview"
                     icon={<Terminal size={16} className="text-slate-400" />}
                     expandedSection={expandedSection}
@@ -210,6 +224,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
                   {/* Raw Response */}
                   <JsonSection
                     id="response"
+                    testId="test-raw-response"
                     title="Raw Response"
                     icon={<Info size={16} className="text-slate-400" />}
                     expandedSection={expandedSection}
@@ -220,6 +235,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
 
                   <JsonSection
                     id="parsed"
+                    testId="test-parsed-result"
                     title="Parsed Result"
                     icon={<CheckCircle2 size={16} className="text-slate-400" />}
                     expandedSection={expandedSection}
@@ -227,6 +243,21 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
                     value={testRun?.parsedResult}
                     textClassName="text-purple-300"
                   />
+
+                  {historyRuns.length > 0 && (
+                    <div data-testid="test-history" className="border rounded-lg p-4 bg-white">
+                      <p className="text-sm font-semibold text-slate-900 mb-2">Test History</p>
+                      <ul className="space-y-1 text-xs">
+                        {historyRuns.slice(0, 10).map(run => (
+                          <li data-testid="test-history-row" key={run.id} className="flex justify-between text-slate-600">
+                            <span data-testid="test-history-status" data-status={run.status}>{run.status}</span>
+                            <span>{new Date(run.createdAt).toLocaleString()}</span>
+                            <span>{run.responseTimeMs}ms</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -241,6 +272,7 @@ export default TestConsole;
 
 const JsonSection = ({
   id,
+  testId,
   title,
   icon,
   expandedSection,
@@ -249,6 +281,7 @@ const JsonSection = ({
   textClassName
 }: {
   id: string;
+  testId?: string;
   title: string;
   icon: React.ReactNode;
   expandedSection: string | null;
@@ -256,7 +289,7 @@ const JsonSection = ({
   value: unknown;
   textClassName: string;
 }) => (
-  <div className="border rounded-lg overflow-hidden">
+  <div data-testid={testId} className="border rounded-lg overflow-hidden">
     <button
       onClick={() => setExpandedSection(expandedSection === id ? null : id)}
       className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"

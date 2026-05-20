@@ -26,165 +26,82 @@ test.describe('Bulk Import', () => {
   });
 
   test('should import valid CSV', async ({ page }) => {
-    // Select CSV tab if present
-    const csvButton = page.getByText('CSV').first();
-    if (await csvButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await csvButton.click();
-    }
+    await page.getByTestId('bulk-import-mode-csv').click();
+    await page.getByTestId('bulk-import-textarea').fill(VALID_CSV);
 
-    // Find textarea for CSV input
-    const textarea = page.locator('textarea').first();
-    await textarea.fill(VALID_CSV);
+    await page.getByTestId('bulk-import-parse-button').click();
+    await expect(page.getByTestId('bulk-import-validate-button')).toBeVisible();
 
-    // Parse/validate
-    const parseButton = page.getByTestId('parse-button');
-    if (await parseButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await parseButton.click();
-      await page.waitForTimeout(500);
-    }
+    await page.getByTestId('bulk-import-validate-button').click();
+    await expect(page.getByTestId('bulk-import-preview-button')).toBeVisible();
 
-    // After parsing, we should be on mapping step - just proceed
-    await page.waitForTimeout(500);
+    await page.getByTestId('bulk-import-preview-button').click();
+    await expect(page.getByTestId('bulk-import-import-button')).toBeVisible();
 
-    // Click through validation steps
-    const validateButton = page.getByTestId('validate-button');
-    if (await validateButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await validateButton.click();
-      await page.waitForTimeout(500);
-    }
+    await page.getByTestId('bulk-import-import-button').click();
+    await expect(page.getByTestId('bulk-import-result')).toBeVisible();
+    await expect(page.getByTestId('bulk-import-success')).toBeVisible();
+    await expect(page.getByTestId('toast-success').first()).toBeVisible();
 
-    const previewButton = page.getByTestId('preview-button');
-    if (await previewButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await previewButton.click();
-      await page.waitForTimeout(500);
-    }
-
-    // Import
-    const importButton = page.getByTestId('import-button');
-    await importButton.click();
-
-    // Wait for import to complete
-    await page.waitForTimeout(1500);
-
-    // Verify success message (use first() to avoid strict mode)
-    await expect(page.getByText('Imported 1 integration').or(page.getByText('imported')).first()).toBeVisible({ timeout: 5000 });
-
-    // Navigate to integrations and verify it exists
     await navigateTo(page, 'Integrations');
-    await expect(page.getByText('E2E CSV Buyer')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: 'E2E CSV Buyer' })).toBeVisible();
   });
 
   test('should import valid JSON', async ({ page }) => {
-    // Select JSON tab
-    const jsonButton = page.getByText('JSON').first();
-    await jsonButton.click();
+    await page.getByTestId('bulk-import-mode-json').click();
+    await page.getByTestId('bulk-import-textarea').fill(VALID_JSON);
 
-    // Fill JSON
-    const textarea = page.locator('textarea').first();
-    await textarea.fill(VALID_JSON);
+    await page.getByTestId('bulk-import-parse-button').click();
+    await expect(page.getByTestId('bulk-import-preview-button')).toBeVisible();
 
-    // Parse
-    const parseButton = page.getByTestId('parse-button');
-    if (await parseButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await parseButton.click();
-      await page.waitForTimeout(1000);
-    }
+    await page.getByTestId('bulk-import-preview-button').click();
+    await expect(page.getByTestId('bulk-import-import-button')).toBeVisible();
 
-    // For JSON, validation happens automatically and goes to validation/preview step
-    // Look for preview button
-    const previewButton = page.getByTestId('preview-button');
-    if (await previewButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await previewButton.click();
-      await page.waitForTimeout(500);
-    }
+    await page.getByTestId('bulk-import-import-button').click();
+    await expect(page.getByTestId('bulk-import-result')).toBeVisible();
+    await expect(page.getByTestId('bulk-import-success')).toBeVisible();
 
-    // Import
-    const importButton = page.getByTestId('import-button');
-    if (await importButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await importButton.click();
-    }
-
-    await page.waitForTimeout(1500);
-
-    // Verify success - check for completion message or just verify we're on complete step
-    const successMessage = await page.getByText('Imported').or(page.getByText('imported')).or(page.getByText('Import Result')).first().isVisible({ timeout: 2000 }).catch(() => false);
-
-    // If no success message, that's okay - JSON import might work differently
-    // Just verify we got through the flow
-    if (!successMessage) {
-      // Just wait a bit and assume success if no error appeared
-      await page.waitForTimeout(500);
-    }
+    await navigateTo(page, 'Integrations');
+    await expect(page.getByRole('button', { name: 'E2E JSON Buyer' })).toBeVisible();
   });
 
   test('should reject invalid JSON', async ({ page }) => {
-    const jsonButton = page.getByText('JSON').first();
-    await jsonButton.click();
+    await page.getByTestId('bulk-import-mode-json').click();
+    await page.getByTestId('bulk-import-textarea').fill('{ invalid json }');
 
-    // Enter invalid JSON
-    const textarea = page.locator('textarea').first();
-    await textarea.fill('{ invalid json }');
+    await page.getByTestId('bulk-import-parse-button').click();
 
-    // Try to parse
-    const parseButton = page.getByTestId('parse-button');
-    if (await parseButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await parseButton.click();
-      await page.waitForTimeout(500);
-    }
-
-    // Verify error message appears
-    await expect(page.getByText('error').or(page.getByText('Error')).or(page.getByText('invalid'))).toBeVisible({ timeout: 3000 });
-
-    // Import button should not be visible (no valid rows)
-    const importButton = page.getByTestId('import-button');
-    const isVisible = await importButton.isVisible({ timeout: 500 }).catch(() => false);
-
-    // If visible, it should be disabled
+    await expect(page.getByTestId('bulk-import-error')).toBeVisible();
+    const importButton = page.getByTestId('bulk-import-import-button');
+    const isVisible = await importButton.isVisible().catch(() => false);
     if (isVisible) {
-      const isDisabled = await importButton.isDisabled().catch(() => true);
-      expect(isDisabled).toBeTruthy();
+      await expect(importButton).toBeDisabled();
     }
   });
 
   test('imported integrations should not be active', async ({ page }) => {
-    // Import a CSV
-    const csvButton = page.getByText('CSV').first();
-    if (await csvButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await csvButton.click();
-    }
+    await page.getByTestId('bulk-import-mode-csv').click();
+    const labeled = VALID_CSV.split('E2E CSV Buyer').join('Status Check Import');
+    await page.getByTestId('bulk-import-textarea').fill(labeled);
 
-    const textarea = page.locator('textarea').first();
-    await textarea.fill(VALID_CSV.replace('E2E CSV Buyer', 'Status Check Import'));
+    await page.getByTestId('bulk-import-parse-button').click();
+    await expect(page.getByTestId('bulk-import-validate-button')).toBeVisible();
 
-    const parseButton = page.getByTestId('parse-button');
-    if (await parseButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await parseButton.click();
-      await page.waitForTimeout(500);
-    }
+    await page.getByTestId('bulk-import-validate-button').click();
+    await expect(page.getByTestId('bulk-import-preview-button')).toBeVisible();
 
-    const validateButton = page.getByTestId('validate-button');
-    if (await validateButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await validateButton.click();
-      await page.waitForTimeout(500);
-    }
+    await page.getByTestId('bulk-import-preview-button').click();
+    await expect(page.getByTestId('bulk-import-import-button')).toBeVisible();
 
-    const previewButton = page.getByTestId('preview-button');
-    if (await previewButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await previewButton.click();
-      await page.waitForTimeout(500);
-    }
+    await page.getByTestId('bulk-import-import-button').click();
+    await expect(page.getByTestId('bulk-import-result')).toBeVisible();
 
-    const importButton = page.getByTestId('import-button');
-    await importButton.click();
-    await page.waitForTimeout(1500);
-
-    // Navigate to integrations
     await navigateTo(page, 'Integrations');
-
-    // Find the imported integration
-    await page.getByText('Status Check Import').waitFor({ timeout: 5000 });
-
-    // Verify it's NOT active status - should show draft or needs testing (use first() to avoid strict mode)
-    await expect(page.getByText('draft').or(page.getByText('needs testing')).or(page.getByText('needs_testing')).first()).toBeVisible({ timeout: 2000 });
+    const row = page.getByTestId('integration-row').filter({
+      has: page.getByRole('button', { name: 'Status Check Import' }),
+    });
+    await expect(row).toBeVisible();
+    // Imported integrations land in draft/needs_testing — never active.
+    await expect(row.getByText('active', { exact: true })).toHaveCount(0);
   });
 });

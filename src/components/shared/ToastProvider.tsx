@@ -105,11 +105,13 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
 
   return (
     <div
+      data-testid={`toast-${type}`}
+      data-toast="true"
       className={`${styles[type]} border rounded-lg shadow-lg p-4 flex items-start gap-3 min-w-[320px] animate-slide-in`}
       role="alert"
     >
       <div className="flex-shrink-0 mt-0.5">{icons[type]}</div>
-      <div className="flex-1 text-sm font-medium">{message}</div>
+      <div data-testid="toast" className="flex-1 text-sm font-medium">{message}</div>
       <button
         onClick={() => onRemove(id)}
         className="flex-shrink-0 text-slate-400 hover:text-slate-600"

@@ -1,51 +1,60 @@
-import { Page, expect } from '@playwright/test';
+import { Page, expect, Locator } from '@playwright/test';
 
 /**
  * E2E Test Helpers for PPCall Integration Studio
- * Provides reusable actions and assertions for common workflows
  *
- * IMPORTANT: This file does not use regex for selectors to comply with project constraints.
- * All selectors use data-testid attributes for stability.
+ * IMPORTANT: No regex is used anywhere in this file or in any e2e/*.spec.ts.
+ * All selectors use data-testid. All string transforms use String methods
+ * (split/join/includes/startsWith/endsWith/toLowerCase) per project policy.
  */
 
-// Navigation test ID mapping
 const NAV_TEST_IDS: Record<string, string> = {
-  'Dashboard': 'nav-dashboard',
-  'Campaigns': 'nav-campaigns',
-  'Integrations': 'nav-integrations',
+  Dashboard: 'nav-dashboard',
+  Campaigns: 'nav-campaigns',
+  Integrations: 'nav-integrations',
   'Add Integration': 'nav-add-integration',
   'Bulk Import': 'nav-bulk-import',
   'Test Console': 'nav-test-console',
   'AI Assistant': 'nav-ai-assistant',
   'Developer/API': 'nav-developer',
-  'Activity': 'nav-activity',
+  Activity: 'nav-activity',
 };
 
-// Page test ID mapping
 const PAGE_TEST_IDS: Record<string, string> = {
-  'Dashboard': 'dashboard-page',
-  'Campaigns': 'campaigns-page',
-  'Integrations': 'integrations-page',
+  Dashboard: 'dashboard-page',
+  Campaigns: 'campaigns-page',
+  Integrations: 'integrations-page',
   'Add Integration': 'wizard-page',
   'Bulk Import': 'bulk-import-page',
   'Test Console': 'test-console-page',
   'AI Assistant': 'ai-assistant-page',
   'Developer/API': 'developer-docs-page',
-  'Activity': 'activity-page',
+  Activity: 'activity-page',
 };
 
+export async function navigateTo(page: Page, viewName: string) {
+  const testId = NAV_TEST_IDS[viewName];
+  if (!testId) {
+    throw new Error(
+      `Unknown view: ${viewName}. Available views: ${Object.keys(NAV_TEST_IDS).join(', ')}`
+    );
+  }
+  await page.getByTestId(testId).click();
+  const pageTestId = PAGE_TEST_IDS[viewName];
+  if (pageTestId) {
+    await expect(page.getByTestId(pageTestId)).toBeVisible();
+  }
+}
+
 export async function resetMockData(page: Page) {
-  // Navigate to app if not already there
   if (!page.url().includes('127.0.0.1:5173')) {
     await page.goto('/');
   }
-
-  // Look for and click Reset Mock Data button
+  await navigateTo(page, 'Developer/API');
   const resetButton = page.getByTestId('reset-mock-data-button');
-  if (await resetButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await resetButton.click();
-    await page.waitForLoadState('networkidle');
-  }
+  await resetButton.click();
+  // Toast confirms the reset completed.
+  await expect(page.getByTestId('toast-info')).toBeVisible();
 }
 
 export async function clearLocalStorage(page: Page) {
@@ -53,63 +62,19 @@ export async function clearLocalStorage(page: Page) {
     localStorage.clear();
   });
   await page.reload();
-  await page.waitForLoadState('networkidle');
+  await expect(page.getByTestId('dashboard-page')).toBeVisible();
 }
 
-export async function navigateTo(page: Page, viewName: string) {
-  const testId = NAV_TEST_IDS[viewName];
-  if (!testId) {
-    throw new Error(`Unknown view: ${viewName}. Available views: ${Object.keys(NAV_TEST_IDS).join(', ')}`);
-  }
-
-  // Click navigation button
-  await page.getByTestId(testId).click();
-
-  // Wait for page to be visible
-  const pageTestId = PAGE_TEST_IDS[viewName];
-  if (pageTestId) {
-    await page.getByTestId(pageTestId).waitFor({ state: 'visible', timeout: 5000 });
-  }
-}
-
-export async function expectNoConsoleErrors() {
-  // This helper is not used as console monitoring is set up per-test
-  // Use setupConsoleMonitoring() at the start of tests instead
-}
-
-export async function createCampaign(page: Page, name: string, vertical: string = 'home_services') {
-  // Navigate to campaigns if not already there
-  await navigateTo(page, 'Campaigns');
-
-  // Click Create Campaign button - using data-testid
-  await page.getByTestId('create-campaign-button').click();
-
-  // Fill in campaign name
-  const nameInput = page.getByTestId('campaign-name-input');
-  if (await nameInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await nameInput.fill(name);
-
-    // Select vertical if there's a dropdown
-    const verticalSelect = page.getByTestId('campaign-vertical-input');
-    if (await verticalSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await verticalSelect.selectOption(vertical);
-    }
-
-    // Submit
-    await page.getByTestId('save-campaign-button').click();
-
-    // Wait for campaign to appear in list
-    await page.getByTestId('campaign-row').first().waitFor({ state: 'visible' });
-  }
-}
-
+/**
+ * Wizard helper. Walks through the Add Integration wizard using only data-testids.
+ * type controls which type to pick. preset controls which preset to choose (or "custom").
+ */
 interface CreateBuyerOptions {
   campaignName: string;
   integrationName: string;
-  type?: 'rtb' | 'static_number' | 'sip' | 'webhook';
+  type?: 'rtb' | 'static_number' | 'sip' | 'webhook' | 'generic_api';
   preset?: string;
   url?: string;
-  method?: 'GET' | 'POST';
 }
 
 export async function createBuyerIntegrationThroughWizard(
@@ -124,207 +89,176 @@ export async function createBuyerIntegrationThroughWizard(
     url = 'https://buyer.example.com/ping',
   } = options;
 
-  // Navigate to Add Integration
   await navigateTo(page, 'Add Integration');
 
-  // Step 1: Choose Direction - Buyer (if not already selected via initialContext)
-  // Look for buyer direction button - may be skipped if direction is pre-selected
-  const buyerButton = page.getByText('Buyer / Destination').or(page.getByText('Buyer'));
-  if (await buyerButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await buyerButton.click();
-  }
-
-  // Click Continue button
+  // Step 1: Direction = buyer
+  await page.getByTestId('wizard-direction-buyer').click();
   await page.getByTestId('wizard-continue-button').click();
 
-  // Step 2: Choose Type
-  // Click the type button (e.g., RTB, Static Number, etc.)
-  await page.getByText(type.toUpperCase().replace('_', ' ')).click();
+  // Step 2: Type
+  const typeTestId = `wizard-type-${type.split('_').join('-')}`;
+  await page.getByTestId(typeTestId).click();
   await page.getByTestId('wizard-continue-button').click();
 
-  // Step 3: Campaign and Name
+  // Step 3: Campaign + name
   await page.getByTestId('campaign-select').selectOption({ label: campaignName });
   await page.getByTestId('integration-name-input').fill(integrationName);
   await page.getByTestId('wizard-continue-button').click();
 
-  // Step 4: Preset selection (if applicable for this type)
-  // This step may be skipped for some types
-  if (type === 'rtb' || type === 'webhook') {
-    const presetButton = page.getByText(preset.replace(/_/g, ' '));
-    if (await presetButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await presetButton.click();
-      // Clicking preset may auto-advance to next step
-    }
+  // Step 4: Preset selection. Selecting a preset auto-advances to Configure.
+  // Some preset keys are filtered out based on type — fall back to "custom"
+  // which is always rendered as the last choice.
+  const requestedPresetTestId = `wizard-preset-${preset.split('_').join('-')}`;
+  const customPresetTestId = 'wizard-preset-custom';
+  const requestedPreset = page.getByTestId(requestedPresetTestId);
+  if (await requestedPreset.isVisible().catch(() => false)) {
+    await requestedPreset.click();
+  } else {
+    await expect(page.getByTestId(customPresetTestId)).toBeVisible();
+    await page.getByTestId(customPresetTestId).click();
   }
 
-  // Step 5: Configure fields
-  // This step varies by type - try to find and fill URL field
-  const urlInput = page.getByLabel('URL').or(page.getByLabel('Endpoint'));
-  if (await urlInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+  // Step 5: Configure — for buyer + RTB/webhook/generic_api, wait for URL input then fill it.
+  if (type === 'rtb' || type === 'webhook' || type === 'generic_api') {
+    const urlInput = page.getByTestId('wizard-url-input');
+    await expect(urlInput).toBeVisible();
     await urlInput.fill(url);
   }
 
-  // Continue through remaining steps by clicking Continue until we reach Save Draft
-  let maxClicks = 5;
-  while (maxClicks > 0) {
+  // Walk Continue → Continue → Continue until Save Draft is the rendered control.
+  for (let i = 0; i < 8; i++) {
+    const saveButton = page.getByTestId('wizard-save-draft-button');
+    if (await saveButton.isVisible().catch(() => false)) break;
     const continueButton = page.getByTestId('wizard-continue-button');
-    if (await continueButton.isVisible({ timeout: 500 }).catch(() => false)) {
-      await continueButton.click();
-      maxClicks--;
-    } else {
-      break;
-    }
+    await expect(continueButton).toBeVisible();
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
   }
 
-  // Final step: Save Draft
-  const saveButton = page.getByTestId('save-draft-button');
-  if (await saveButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await saveButton.click();
-  }
-
-  // Wait for confirmation
-  await page.waitForTimeout(1000);
+  await expect(page.getByTestId('wizard-save-draft-button')).toBeVisible();
+  await page.getByTestId('wizard-save-draft-button').click();
+  await expect(page.getByTestId('wizard-saved-step')).toBeVisible();
 }
 
-export async function runIntegrationTest(page: Page) {
-  // Assumes we're on integration detail page with Test Console tab
-  await page.getByTestId('tab-test').click();
+export async function openIntegrationDetailByName(page: Page, name: string) {
+  await navigateTo(page, 'Integrations');
+  await page.getByRole('button', { name, exact: true }).first().click();
+  await expect(page.getByTestId('integration-detail-page')).toBeVisible();
+}
 
-  // Click Run Test button
+/**
+ * Open the first integration whose detail page shows an enabled activate-button.
+ * Useful for tests that exercise activation flow — skipping already-active ones.
+ */
+export async function openFirstActivatableIntegration(page: Page) {
+  await navigateTo(page, 'Integrations');
+  const rows = page.getByTestId('integration-row');
+  const count = await rows.count();
+  for (let i = 0; i < count; i++) {
+    await rows.nth(i).getByRole('button').first().click();
+    await expect(page.getByTestId('integration-detail-page')).toBeVisible();
+    const isDisabled = await page
+      .getByTestId('activate-button')
+      .isDisabled()
+      .catch(() => true);
+    if (!isDisabled) return;
+    await page.getByTestId('back-button').click();
+    await expect(page.getByTestId('integrations-page')).toBeVisible();
+  }
+  throw new Error('No integration with enabled activate-button found');
+}
+
+export async function runIntegrationTestFromDetail(page: Page) {
+  await page.getByTestId('tab-test-console').click();
   await page.getByTestId('run-test-button').click();
+  await expect(page.getByTestId('test-result-status')).toBeVisible();
+}
 
-  // Wait for test to complete
-  await page.waitForTimeout(2000);
-
-  // Check for test results - look for passed or failed badge
-  await expect(page.getByText('Test PASSED').or(page.getByText('Test FAILED'))).toBeVisible();
+export async function getTestResultStatus(page: Page): Promise<string> {
+  const status = await page
+    .getByTestId('test-result-status')
+    .getAttribute('data-status');
+  return status || '';
 }
 
 export async function activateIntegration(page: Page) {
-  // Look for Activate button using test ID
-  const activateButton = page.getByTestId('activate-button');
-  await activateButton.click();
-
-  // Confirm if there's a confirmation dialog (unlikely but check for it)
-  const confirmButton = page.getByText('Confirm').or(page.getByText('Yes'));
-  if (await confirmButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await confirmButton.click();
-  }
-
-  // Wait for activation to complete
-  await page.waitForTimeout(500);
+  await page.getByTestId('activate-button').click();
+  await expect(page.getByTestId('integration-action-message')).toBeVisible();
 }
 
-export async function importCsv(page: Page, csvText: string) {
-  // Navigate to Bulk Import
+export async function pasteCsvBulkImport(page: Page, csvText: string) {
   await navigateTo(page, 'Bulk Import');
+  await page.getByTestId('bulk-import-mode-csv').click();
+  await page.getByTestId('bulk-import-textarea').fill(csvText);
+  await page.getByTestId('bulk-import-parse-button').click();
 
-  // Select CSV mode - look for CSV button
-  const csvButton = page.getByText('CSV').first();
-  if (await csvButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await csvButton.click();
-  }
-
-  // Paste CSV text into textarea
-  const textarea = page.locator('textarea').first();
-  await textarea.fill(csvText);
-
-  // Click Parse Content button
-  const parseButton = page.getByTestId('parse-button');
-  if (await parseButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await parseButton.click();
-    await page.waitForTimeout(500);
-  }
-
-  // Click Validate Rows button
-  const validateButton = page.getByTestId('validate-button');
-  if (await validateButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+  const validateButton = page.getByTestId('bulk-import-validate-button');
+  if (await validateButton.isVisible().catch(() => false)) {
     await validateButton.click();
-    await page.waitForTimeout(500);
   }
-
-  // Click Preview button
-  const previewButton = page.getByTestId('preview-button');
-  if (await previewButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+  const previewButton = page.getByTestId('bulk-import-preview-button');
+  if (await previewButton.isVisible().catch(() => false)) {
     await previewButton.click();
-    await page.waitForTimeout(500);
   }
-
-  // Click Import button
-  const importButton = page.getByTestId('import-button');
-  if (await importButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await importButton.click();
-    await page.waitForTimeout(1000);
-  }
+  await page.getByTestId('bulk-import-import-button').click();
+  await expect(page.getByTestId('bulk-import-result')).toBeVisible();
 }
 
-export async function importJson(page: Page, jsonText: string) {
-  // Navigate to Bulk Import
+export async function pasteJsonBulkImport(page: Page, jsonText: string) {
   await navigateTo(page, 'Bulk Import');
-
-  // Select JSON mode - look for JSON button
-  const jsonButton = page.getByText('JSON').first();
-  await jsonButton.click();
-
-  // Paste JSON text into textarea
-  const textarea = page.locator('textarea').first();
-  await textarea.fill(jsonText);
-
-  // Click Parse Content button
-  const parseButton = page.getByTestId('parse-button');
-  if (await parseButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await parseButton.click();
-    await page.waitForTimeout(500);
-  }
-
-  // For JSON, validation happens automatically, so skip to preview
-  const previewButton = page.getByTestId('preview-button');
-  if (await previewButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+  await page.getByTestId('bulk-import-mode-json').click();
+  await page.getByTestId('bulk-import-textarea').fill(jsonText);
+  await page.getByTestId('bulk-import-parse-button').click();
+  const previewButton = page.getByTestId('bulk-import-preview-button');
+  if (await previewButton.isVisible().catch(() => false)) {
     await previewButton.click();
-    await page.waitForTimeout(500);
   }
-
-  // Click Import button
-  const importButton = page.getByTestId('import-button');
-  if (await importButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+  const importButton = page.getByTestId('bulk-import-import-button');
+  if (await importButton.isVisible().catch(() => false)) {
     await importButton.click();
-    await page.waitForTimeout(1000);
+    await expect(page.getByTestId('bulk-import-result')).toBeVisible();
   }
 }
 
 /**
- * Monitor console for errors during test execution
- * Call this at the beginning of a test
+ * Console monitoring: returns a string array that fills with error messages.
+ * Call once per test.
  */
 export function setupConsoleMonitoring(page: Page): string[] {
   const consoleErrors: string[] = [];
-
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       consoleErrors.push(msg.text());
     }
   });
-
   page.on('pageerror', (error) => {
     consoleErrors.push(error.message);
   });
-
   return consoleErrors;
 }
 
 /**
- * Wait for an element to be visible with custom timeout
+ * Status assertion using the integration-status badge.
+ * Normalizes both sides via toLowerCase + trim — no regex.
  */
-export async function waitForVisible(page: Page, selector: string, timeout = 5000) {
-  await page.waitForSelector(selector, { state: 'visible', timeout });
+export async function expectIntegrationStatus(page: Page, expectedStatus: string) {
+  const badge: Locator = page.getByTestId('integration-status');
+  await expect(badge).toBeVisible();
+  const actual = (await badge.textContent()) || '';
+  const normalize = (value: string) =>
+    value.split(' ').join('').toLowerCase().trim();
+  expect(normalize(actual)).toContain(normalize(expectedStatus));
 }
 
 /**
- * Check if integration is in a specific status
+ * Wait for a toast of a given type to be visible. Returns the toast text.
  */
-export async function expectIntegrationStatus(page: Page, expectedStatus: string) {
-  const statusBadge = page.locator('[data-testid="integration-status"]').or(
-    page.getByText(new RegExp(expectedStatus, 'i'))
-  );
-  await expect(statusBadge).toBeVisible();
+export async function expectToast(
+  page: Page,
+  type: 'success' | 'error' | 'warning' | 'info'
+): Promise<string> {
+  const toast = page.getByTestId(`toast-${type}`).first();
+  await expect(toast).toBeVisible();
+  const text = await toast.getByTestId('toast').textContent();
+  return text || '';
 }

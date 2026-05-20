@@ -15,9 +15,10 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   className?: string;
+  "data-testid"?: string;
 }
 
-const Badge: React.FC<BadgeProps> = ({ children, variant = "default", className }) => {
+const Badge: React.FC<BadgeProps> = ({ children, variant = "default", className, ...rest }) => {
   const variants: Record<string, string> = {
     default: "bg-slate-100 text-slate-800",
     success: "bg-green-100 text-green-800",
@@ -40,13 +41,17 @@ const Badge: React.FC<BadgeProps> = ({ children, variant = "default", className 
   };
 
   const label = typeof children === "string" ? children.replaceAll("_", " ") : children;
+  const testId = (rest as { "data-testid"?: string })["data-testid"];
 
   return (
-    <span className={cn(
-      "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wider",
-      variants[variant as string] || variants.default,
-      className
-    )}>
+    <span
+      data-testid={testId}
+      className={cn(
+        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wider",
+        variants[variant as string] || variants.default,
+        className
+      )}
+    >
       {label}
     </span>
   );

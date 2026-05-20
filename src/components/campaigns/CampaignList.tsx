@@ -4,6 +4,7 @@ import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { useToast } from "../shared/ToastProvider";
 
 interface CampaignListProps {
   onSelectCampaign: (id: string) => void;
@@ -12,14 +13,16 @@ interface CampaignListProps {
 const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
 
   const handleCreateCampaign = () => {
     const campaignNumber = state.campaigns.length + 1;
-    actions.createCampaign({
+    const campaign = actions.createCampaign({
       name: `New Mock Campaign ${campaignNumber}`,
       vertical: "General",
       status: "draft"
     });
+    toast.success(`Campaign "${campaign.name}" created.`);
   };
   
   return (

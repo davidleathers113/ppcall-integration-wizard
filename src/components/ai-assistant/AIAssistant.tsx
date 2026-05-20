@@ -5,6 +5,7 @@ import Badge from "../shared/Badge";
 import type { IntegrationConfig, IntegrationDirection, IntegrationType } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { useToast } from "../shared/ToastProvider";
 
 interface AIAssistantProps {
   onComplete?: (id: string) => void;
@@ -31,6 +32,7 @@ const fieldSynonyms = {
 const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
   const [instructions, setInstructions] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [proposedConfig, setProposedConfig] = useState<AIConfigProposal | null>(null);
@@ -60,13 +62,19 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
       config: proposedConfig.config
     });
     setMessage(`Draft integration created from AI proposal: ${integration.name}.`);
+    toast.success(`AI draft "${integration.name}" created.`);
     onComplete?.(integration.id);
   };
 
   const handleCopyProposal = async () => {
     if (!proposedConfig) return;
-    await navigator.clipboard.writeText(JSON.stringify(proposedConfig.config, null, 2));
-    setMessage("Proposed normalized config copied to clipboard.");
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(proposedConfig.config, null, 2));
+      setMessage("Proposed normalized config copied to clipboard.");
+      toast.success("Proposal JSON copied to clipboard.");
+    } catch {
+      toast.error("Could not copy proposal to clipboard.");
+    }
   };
 
   return (
@@ -76,18 +84,19 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
         <p className="text-slate-500">Paste buyer or publisher instructions and generate a draft normalized configuration.</p>
       </header>
 
-      {message && <div className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">{message}</div>}
+      {message && <div data-testid="ai-message" className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">{message}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Source Instructions" subtitle="Paste technical documentation or emails here">
           <textarea
+            data-testid="ai-instructions-textarea"
             className="w-full h-80 p-4 text-sm bg-slate-50 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all resize-none"
             placeholder="POST to https://buyer.example.com/ping with caller_id, zip, state. If accepted=true, use phone_number as transfer destination. Bid is returned as payout."
             value={instructions}
             onChange={(event) => setInstructions(event.target.value)}
           />
           <div className="mt-4 flex justify-end">
-            <button onClick={handleAnalyze} disabled={isAnalyzing || !instructions.trim()} className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+            <button data-testid="ai-generate-button" onClick={handleAnalyze} disabled={isAnalyzing || !instructions.trim()} className="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
               {isAnalyzing ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Wand2 size={18} />}
               Analyze Instructions
             </button>
@@ -108,13 +117,13 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
           </div>
         ) : (
           <Card title="Proposed Configuration" headerAction={<Badge variant="success" className="bg-green-500 text-white border-none">{proposedConfig!.confidence}% Confidence</Badge>}>
-            <div className="space-y-5">
+            <div data-testid="ai-proposal" className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="text-xs font-bold text-slate-500 uppercase">Draft Name
-                  <input className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={draftName} onChange={event => setDraftName(event.target.value)} />
+                  <input data-testid="ai-draft-name-input" className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={draftName} onChange={event => setDraftName(event.target.value)} />
                 </label>
                 <label className="text-xs font-bold text-slate-500 uppercase">Campaign
-                  <select className="mt-1 w-full p-2 border rounded-lg text-sm normal-case bg-white" value={campaignId} onChange={event => setCampaignId(event.target.value)}>
+                  <select data-testid="ai-campaign-select" className="mt-1 w-full p-2 border rounded-lg text-sm normal-case bg-white" value={campaignId} onChange={event => setCampaignId(event.target.value)}>
                     {state.campaigns.map(campaign => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
                   </select>
                 </label>
@@ -148,7 +157,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onComplete }) => {
                 <pre className="bg-slate-900 rounded-xl p-4 text-xs text-blue-300 font-mono overflow-auto max-h-64">{JSON.stringify(proposedConfig!.config, null, 2)}</pre>
               </div>
 
-              <button onClick={handleApply} disabled={!campaignId || !draftName.trim()} className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+              <button data-testid="ai-apply-button" onClick={handleApply} disabled={!campaignId || !draftName.trim()} className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-slate-200 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
                 <CheckCircle size={18} />
                 Apply and Open Draft
               </button>

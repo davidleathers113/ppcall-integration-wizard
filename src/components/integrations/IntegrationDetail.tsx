@@ -18,6 +18,7 @@ import { calculateFreshnessStatus, getDaysSince, getFreshnessDetails } from "../
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
 import { selectActivityForIntegration, selectLatestTestRunForIntegration } from "../../store/selectors";
+import { useToast } from "../shared/ToastProvider";
 import BuyerConfigForm from "./BuyerConfigForm";
 import RawJsonEditor from "./RawJsonEditor";
 import PublisherInstructions from "./PublisherInstructions";
@@ -31,6 +32,7 @@ interface IntegrationDetailProps {
 const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, onBack }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -48,16 +50,23 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
   const handleActivate = () => {
     const result = actions.activateIntegration(integration.id);
     setActionMessage(result.message);
+    if (result.ok) {
+      toast.success(result.message);
+    } else {
+      toast.warning(result.message);
+    }
   };
 
   const handlePause = () => {
     actions.pauseIntegration(integration.id);
     setActionMessage("Integration paused.");
+    toast.info("Integration paused.");
   };
 
   const handleArchive = () => {
     actions.archiveIntegration(integration.id);
     setActionMessage("Integration archived.");
+    toast.info("Integration archived.");
   };
 
   const tabs = [
@@ -65,8 +74,8 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
     { id: "freshness", label: "Freshness", icon: Gauge },
     { id: "configure", label: "Configure", icon: Settings },
     { id: "raw-json", label: "Raw JSON", icon: Code },
-    { id: "test", label: "Test Console", icon: Terminal },
-    ...(isPublisher ? [{ id: "instructions", label: "Instructions", icon: FileText }] : []),
+    { id: "test-console", label: "Test Console", icon: Terminal },
+    ...(isPublisher ? [{ id: "publisher-instructions", label: "Instructions", icon: FileText }] : []),
     { id: "activity", label: "Activity", icon: History },
   ];
 
@@ -173,22 +182,22 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
                 )}
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setActiveTab("test")} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-bold">Run Test</button>
-                <button onClick={() => actions.markIntegrationUsed(integration.id)} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold">Mark Used</button>
+                <button onClick={() => setActiveTab("test-console")} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-bold">Run Test</button>
+                <button data-testid="mark-used-button" onClick={() => { actions.markIntegrationUsed(integration.id); setActionMessage("Integration marked used."); toast.info("Integration marked used."); }} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold">Mark Used</button>
               </div>
             </div>
           </Card>
         );
       case "raw-json":
         return <RawJsonEditor integration={integration} />;
-      case "test":
+      case "test-console":
         return (
           <Card>
             {/* Minimal inline test console injected with just this integration */}
             <TestConsole overrideIntegrationId={integration.id} />
           </Card>
         );
-      case "instructions":
+      case "publisher-instructions":
         return <PublisherInstructions integration={integration} />;
       case "activity":
         return (
@@ -263,7 +272,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
       </header>
 
       {actionMessage && (
-        <div className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">
+        <div data-testid="integration-action-message" className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">
           {actionMessage}
         </div>
       )}

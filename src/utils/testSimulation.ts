@@ -2,6 +2,14 @@ import type { Integration, TestRun, TestChecklistItem } from "../models/appTypes
 import { resolveObjectTokens, DEFAULT_TOKENS } from "./tokenResolver";
 import { extractJsonPath } from "./jsonPath";
 import { createId } from "./id";
+import {
+  inferDestination,
+  inferDestinationMode,
+  inferDialIvr,
+  inferDuplicateRules,
+  inferRecordingSettings,
+  inferRevenueSettings,
+} from "./buyerConfigDefaults";
 
 export function simulateIntegrationTest(integration: Integration, inputTokens: Record<string, string> = DEFAULT_TOKENS): TestRun {
   const isBuyer = integration.direction === "buyer";
@@ -212,6 +220,145 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
     }
   }
 
+  // 4. Advanced (Ringba-inspired) checks — buyers only
+  if (isBuyer) {
+    const destinationMode = inferDestinationMode(integration);
+    const destination = inferDestination(integration);
+    const duplicate = inferDuplicateRules(config);
+    const revenue = inferRevenueSettings(config);
+    const recording = inferRecordingSettings(config);
+    const dialIvr = inferDialIvr(config);
+
+    // Destination mode coherence — only emit if there is a destination conflict
+    // we can speak to without conflicting with legacy checks above.
+    if (destinationMode === "dynamic_number_from_response") {
+      const hasPath = Boolean(
+        destination.dynamicNumberPath || config.responseParsing?.destinationNumberPath
+      );
+      if (!hasPath) {
+        checklist.push({
+          label: "Dynamic destination path",
+          status: "fail",
+          message: "Dynamic number destination requires a destination number path.",
+        });
+      }
+    }
+    if (destinationMode === "dynamic_sip_from_response") {
+      const hasPath = Boolean(destination.dynamicSipPath || config.responseParsing?.sipAddressPath);
+      if (!hasPath) {
+        checklist.push({
+          label: "Dynamic destination path",
+          status: "fail",
+          message: "Dynamic SIP destination requires a SIP address path.",
+        });
+      }
+    }
+    if (destinationMode === "static_sip" && !destination.sipAddress) {
+      checklist.push({
+        label: "Static destination",
+        status: "fail",
+        message: "Static SIP destination requires a SIP address.",
+      });
+    }
+
+    // Caps sanity — only validate that explicit values are positive integers.
+    if (config.caps) {
+      const numericKeys = ["global", "monthly", "daily", "hourly", "concurrency"] as const;
+      const invalid = numericKeys.find(key => {
+        const value = config.caps?.[key];
+        if (value === undefined) return false;
+        return !Number.isFinite(value) || value <= 0;
+      });
+      if (invalid) {
+        checklist.push({
+          label: "Caps valid",
+          status: "fail",
+          message: `Cap '${invalid}' must be a positive number.`,
+        });
+      } else if (numericKeys.every(key => config.caps?.[key] === undefined)) {
+        checklist.push({
+          label: "Caps configured",
+          status: "warning",
+          message: "No caps configured. Consider adding daily/hourly limits.",
+        });
+      }
+    } else {
+      checklist.push({
+        label: "Caps configured",
+        status: "warning",
+        message: "No caps configured. Consider adding daily/hourly limits.",
+      });
+    }
+
+    // Schedule timezone is required if a schedule is set.
+    if (config.schedule) {
+      if (!config.schedule.timezone) {
+        checklist.push({
+          label: "Schedule timezone",
+          status: "fail",
+          message: "Schedule must include a timezone.",
+        });
+      } else if (config.schedule.mode === "always_open") {
+        checklist.push({
+          label: "Schedule",
+          status: "warning",
+          message: "Schedule is always open. Confirm buyer accepts 24/7 traffic.",
+        });
+      }
+    }
+
+    // Duplicate restriction coherence
+    if (duplicate.mode === "restrict") {
+      const hasWindow = duplicate.windowMinutes !== undefined && duplicate.windowMinutes > 0;
+      checklist.push({
+        label: "Duplicate window",
+        status: hasWindow ? "pass" : "fail",
+        message: hasWindow
+          ? "Duplicate restriction window configured."
+          : "Restrict duplicates mode requires a positive window in minutes.",
+      });
+    }
+
+    // Revenue coherence — only when override is selected.
+    if (revenue.mode === "override") {
+      const ok =
+        (revenue.payout !== undefined && revenue.payout > 0) ||
+        Boolean(revenue.dynamicBidPath);
+      checklist.push({
+        label: "Revenue override coherent",
+        status: ok ? "pass" : "fail",
+        message: ok
+          ? "Override payout or dynamic bid path configured."
+          : "Override revenue requires a payout or dynamic bid path.",
+      });
+    }
+
+    // Recording warning
+    if (recording.mode === "disabled") {
+      checklist.push({
+        label: "Call recording",
+        status: "warning",
+        message: "Recording is disabled. QA review and dispute resolution may be limited.",
+      });
+    }
+
+    // Dial IVR digit sanity (numeric, *, #, comma pause, plus tokens)
+    if (dialIvr.enabled && dialIvr.digits) {
+      const stripped = stripTokens(dialIvr.digits);
+      const allowed = "0123456789*#,wp ";
+      const invalidChar = stripped
+        .split("")
+        .find(char => !allowed.includes(char));
+      if (invalidChar !== undefined) {
+        checklist.push({
+          label: "Dial IVR digits",
+          status: "warning",
+          message: "Dial IVR digits should only use numeric values, pauses, and supported tokens.",
+        });
+      }
+    }
+  }
+
   const isTimeout = config.timeoutSeconds ? (responseTimeMs / 1000 > config.timeoutSeconds) : false;
   
   if (isTimeout) {
@@ -258,4 +405,24 @@ export function simulateIntegrationTest(integration: Integration, inputTokens: R
     responseTimeMs,
     createdAt: new Date().toISOString()
   };
+}
+
+function stripTokens(value: string): string {
+  let result = "";
+  let pos = 0;
+  while (pos < value.length) {
+    const openIndex = value.indexOf("{{", pos);
+    if (openIndex === -1) {
+      result += value.substring(pos);
+      break;
+    }
+    result += value.substring(pos, openIndex);
+    const closeIndex = value.indexOf("}}", openIndex + 2);
+    if (closeIndex === -1) {
+      result += value.substring(openIndex);
+      break;
+    }
+    pos = closeIndex + 2;
+  }
+  return result;
 }

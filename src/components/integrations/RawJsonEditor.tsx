@@ -3,6 +3,7 @@ import { CheckCircle, Code, Copy, RefreshCw } from "lucide-react";
 import type { Integration, IntegrationDirection, IntegrationStatus, IntegrationType } from "../../models/appTypes";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { useToast } from "../shared/ToastProvider";
 
 interface RawJsonEditorProps {
   integration: Integration;
@@ -11,6 +12,7 @@ interface RawJsonEditorProps {
 const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
   const [jsonText, setJsonText] = useState(() => JSON.stringify(integration, null, 2));
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -39,13 +41,12 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
 
       setError(null);
       setIsSaved(true);
+      toast.success("Raw JSON applied. Integration updated.");
       setTimeout(() => setIsSaved(false), 3000);
     } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError("Invalid JSON syntax");
-      }
+      const message = e instanceof Error ? e.message : "Invalid JSON syntax";
+      setError(message);
+      toast.error(`Raw JSON validation failed: ${message}`);
     }
   };
 
@@ -67,9 +68,11 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
     try {
       await navigator.clipboard.writeText(jsonText);
       setIsSaved(true);
+      toast.success("JSON copied to clipboard.");
       setTimeout(() => setIsSaved(false), 1500);
     } catch {
       setError("Could not copy JSON to clipboard");
+      toast.error("Could not copy JSON to clipboard.");
     }
   };
 
@@ -82,21 +85,21 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
         </div>
         <div className="flex gap-2">
           <button
-            data-testid="format-json-button"
+            data-testid="raw-json-format-button"
             onClick={handleFormat}
             className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1"
           >
             <Code size={14} /> Format JSON
           </button>
           <button
-            data-testid="reset-json-button"
+            data-testid="raw-json-reset-button"
             onClick={handleReset}
             className="px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-1"
           >
             <RefreshCw size={14} /> Reset
           </button>
           <button
-            data-testid="save-json-button"
+            data-testid="raw-json-apply-button"
             onClick={handleValidateAndSave}
             className="px-3 py-1.5 text-xs font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 flex items-center gap-1"
           >
@@ -107,19 +110,21 @@ const RawJsonEditor: React.FC<RawJsonEditorProps> = ({ integration }) => {
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+        <div data-testid="raw-json-error" className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
           <strong>Validation Error:</strong> {error}
         </div>
       )}
 
       <div className="relative">
         <textarea
+          data-testid="raw-json-textarea"
           value={jsonText}
           onChange={(e) => setJsonText(e.target.value)}
           className="w-full h-[600px] p-4 bg-slate-900 text-blue-300 font-mono text-sm rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
           spellCheck={false}
         />
-        <button 
+        <button
+          data-testid="raw-json-copy-button"
           onClick={handleCopy}
           className="absolute top-4 right-4 p-2 bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-colors"
           title="Copy to clipboard"

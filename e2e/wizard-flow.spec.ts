@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupConsoleMonitoring, navigateTo } from './helpers';
+import { setupConsoleMonitoring, navigateTo, createBuyerIntegrationThroughWizard } from './helpers';
 
 test.describe('Integration Wizard Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -9,65 +9,46 @@ test.describe('Integration Wizard Flow', () => {
   test('should create buyer integration through wizard', async ({ page }) => {
     const consoleErrors = setupConsoleMonitoring(page);
 
-    // Navigate to Add Integration using helper
-    await navigateTo(page, 'Add Integration');
+    await navigateTo(page, 'Campaigns');
+    const firstCampaignButton = page.getByTestId('campaign-row').first().getByRole('button').first();
+    const campaignName = (await firstCampaignButton.textContent())?.trim() || '';
+    expect(campaignName.length).toBeGreaterThan(0);
 
-    // Step 1: Direction - Choose Buyer
-    await expect(page.getByRole('heading', { name: 'Choose Integration Direction' })).toBeVisible();
-    const buyerButton = page.getByRole('button').filter({ hasText: 'Buyer / Destination' });
-    await buyerButton.click();
+    const integrationName = 'E2E Wizard Buyer';
+    await createBuyerIntegrationThroughWizard(page, {
+      campaignName,
+      integrationName,
+      type: 'rtb',
+      preset: 'generic_json_post',
+      url: 'https://buyer.example.com/ping',
+    });
 
-    // Move to next step
-    await page.getByTestId('wizard-continue-button').click();
+    await expect(page.getByTestId('wizard-saved-step')).toBeVisible();
 
-    // Step 2: Type - Choose RTB
-    await page.getByText('RTB / Ping-Post').or(page.getByText('RTB')).first().click();
-    await page.getByTestId('wizard-continue-button').click();
+    // Open detail and confirm the integration was saved
+    await page.getByTestId('wizard-open-detail-button').click();
+    await expect(page.getByTestId('integration-detail-page')).toBeVisible();
+    await expect(page.getByRole('heading', { name: integrationName })).toBeVisible();
 
-    // Step 3: Campaign and Name
-    const campaignSelect = page.getByTestId('campaign-select');
-    await campaignSelect.selectOption({ index: 1 }); // Select first campaign
-
-    await page.getByTestId('integration-name-input').fill('E2E Test Buyer Integration');
-    await page.getByTestId('wizard-continue-button').click();
-
-    // Step 4: Preset (if shown) - skip this step and move to configuration
-    // Just try to advance - wizard will show preset or skip to config
-    await page.waitForTimeout(500);
-
-    // The wizard flow is complex and depends on the specific implementation
-    // For this test, we'll verify the wizard loads and we can navigate through it
-    // Rather than trying to complete the entire flow which may have specific validation requirements
-
-    // Verify we got past the initial steps
-    await page.waitForTimeout(1000);
-
-    // Verify the wizard page is still showing (we haven't errored out)
-    const wizardStillActive = await page.getByTestId('wizard-page').isVisible().catch(() => false);
-    expect(wizardStillActive).toBeTruthy();
-
-    // Verify no console errors during wizard navigation
     expect(consoleErrors).toHaveLength(0);
   });
 
-  test('wizard should load and allow navigation through steps', async ({ page }) => {
-    // This test verifies the wizard loads and basic navigation works
-    // Navigate to Add Integration using helper
+  test('wizard should load and allow direction selection', async ({ page }) => {
     await navigateTo(page, 'Add Integration');
-
-    // Verify wizard loaded
     await expect(page.getByTestId('wizard-page')).toBeVisible();
 
-    // Verify we can navigate through direction selection
-    const buyerButton = page.getByRole('button').filter({ hasText: 'Buyer / Destination' });
-    await expect(buyerButton).toBeVisible();
-    await buyerButton.click();
+    await expect(page.getByTestId('wizard-direction-buyer')).toBeVisible();
+    await expect(page.getByTestId('wizard-direction-publisher')).toBeVisible();
+    await page.getByTestId('wizard-direction-buyer').click();
 
-    // Verify continue button is present
     const continueButton = page.getByTestId('wizard-continue-button');
-    await expect(continueButton).toBeVisible();
+    await expect(continueButton).toBeEnabled();
+    await continueButton.click();
 
-    // This confirms the wizard is functional for basic navigation
-    // Full integration creation would require all fields to be properly configured
+    // Now on type step
+    await expect(page.getByTestId('wizard-type-rtb')).toBeVisible();
+    await expect(page.getByTestId('wizard-type-static-number')).toBeVisible();
+    await expect(page.getByTestId('wizard-type-sip')).toBeVisible();
+    await expect(page.getByTestId('wizard-type-webhook')).toBeVisible();
   });
 });

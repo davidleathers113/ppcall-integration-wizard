@@ -4,6 +4,7 @@ import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
+import { useToast } from "../shared/ToastProvider";
 import { autoMapColumn, IMPORT_FIELDS, IMPORT_FIELD_KEYS, type ColumnMapping, type ImportMode, type ImportStep, type ImportValidationResult, type ParseResult } from "../../utils/import/importSchema";
 import { parseCsvImport, parseJsonImport } from "../../utils/import/importParser";
 import { validateColumnMappings, validateRows } from "../../utils/import/importValidator";
@@ -15,6 +16,7 @@ const stepOrder: ImportStep[] = ["source", "mapping", "validation", "preview", "
 const BulkImport: React.FC = () => {
   const { state } = useAppContext();
   const actions = useAppActions();
+  const toast = useToast();
   const [mode, setMode] = useState<ImportMode>("csv");
   const [step, setStep] = useState<ImportStep>("source");
   const [rawContent, setRawContent] = useState("");
@@ -71,6 +73,7 @@ const BulkImport: React.FC = () => {
     setImportedIds(imported.map(integration => integration.id));
     setStep("complete");
     setMessage(`Imported ${imported.length} integration${imported.length === 1 ? "" : "s"}.`);
+    toast.success(`Imported ${imported.length} integration${imported.length === 1 ? "" : "s"} as drafts.`);
   };
 
   const handleFile = async (file: File | undefined) => {
@@ -85,8 +88,10 @@ const BulkImport: React.FC = () => {
     try {
       await navigator.clipboard.writeText(IMPORT_TEMPLATES[templateKey].content);
       setMessage("Template copied to clipboard.");
+      toast.success("Template copied to clipboard.");
     } catch {
       setMessage("Clipboard copy failed. Select the template text and copy manually.");
+      toast.error("Clipboard copy failed.");
     }
   };
 
@@ -133,7 +138,14 @@ const BulkImport: React.FC = () => {
         ))}
       </div>
 
-      {message && <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">{message}</div>}
+      {message && <div data-testid="bulk-import-message" className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">{message}</div>}
+      {parseResult.errors.length > 0 && step !== "mapping" && (
+        <div data-testid="bulk-import-error" className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700">
+          {parseResult.errors.map(issue => (
+            <p key={`${issue.code}-${issue.field || issue.message}`}>{issue.field ? `${issue.field}: ` : ""}{issue.message}</p>
+          ))}
+        </div>
+      )}
       {fileMeta && step !== "source" && (
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <FileText size={14} />
@@ -144,18 +156,18 @@ const BulkImport: React.FC = () => {
       {step === "source" && (
         <Card title="1. Source" subtitle="Paste content or upload a file">
           <div className="flex gap-4 mb-4">
-            <button onClick={() => setMode("csv")} className={`px-3 py-2 rounded-lg text-sm font-bold ${mode === "csv" ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600"}`}>CSV</button>
-            <button onClick={() => setMode("json")} className={`px-3 py-2 rounded-lg text-sm font-bold ${mode === "json" ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600"}`}>JSON</button>
+            <button data-testid="bulk-import-mode-csv" onClick={() => setMode("csv")} className={`px-3 py-2 rounded-lg text-sm font-bold ${mode === "csv" ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600"}`}>CSV</button>
+            <button data-testid="bulk-import-mode-json" onClick={() => setMode("json")} className={`px-3 py-2 rounded-lg text-sm font-bold ${mode === "json" ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600"}`}>JSON</button>
           </div>
           <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 text-center text-sm text-slate-500 mb-4 cursor-pointer">
             <Upload size={20} className="mx-auto mb-2" />
             Upload {mode.toUpperCase()} file
-            <input className="hidden" type="file" accept={mode === "csv" ? ".csv,text/csv" : ".json,application/json"} onChange={event => void handleFile(event.target.files?.[0])} />
+            <input data-testid="bulk-import-file-input" className="hidden" type="file" accept={mode === "csv" ? ".csv,text/csv" : ".json,application/json"} onChange={event => void handleFile(event.target.files?.[0])} />
           </label>
           {fileMeta && <p className="text-xs text-slate-500 mb-3"><FileText size={14} className="inline mr-1" />{fileMeta.name} • {(fileMeta.size / 1024).toFixed(1)} KB</p>}
-          <textarea className="w-full h-72 p-4 font-mono text-sm bg-slate-50 border rounded-xl" value={rawContent} onChange={event => setRawContent(event.target.value)} placeholder={mode === "csv" ? IMPORT_TEMPLATES.buyer_rtb.content : IMPORT_TEMPLATES.json.content} />
+          <textarea data-testid="bulk-import-textarea" className="w-full h-72 p-4 font-mono text-sm bg-slate-50 border rounded-xl" value={rawContent} onChange={event => setRawContent(event.target.value)} placeholder={mode === "csv" ? IMPORT_TEMPLATES.buyer_rtb.content : IMPORT_TEMPLATES.json.content} />
           <div className="mt-4 flex justify-end">
-            <button data-testid="parse-button" onClick={() => parseContent()} disabled={!rawContent.trim()} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Parse Content</button>
+            <button data-testid="bulk-import-parse-button" onClick={() => parseContent()} disabled={!rawContent.trim()} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Parse Content</button>
           </div>
         </Card>
       )}
@@ -182,7 +194,7 @@ const BulkImport: React.FC = () => {
             ))}
           </div>
           <div className="mt-4 flex justify-end">
-            <button data-testid="validate-button" onClick={() => validateParsedRows()} disabled={parseResult.errors.length > 0 || columnIssues.length > 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Validate Rows</button>
+            <button data-testid="bulk-import-validate-button" onClick={() => validateParsedRows()} disabled={parseResult.errors.length > 0 || columnIssues.length > 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Validate Rows</button>
           </div>
         </Card>
       )}
@@ -207,9 +219,9 @@ const BulkImport: React.FC = () => {
           <div className="mt-4 flex justify-between">
             <button onClick={() => setStep("mapping")} className="px-3 py-2 bg-slate-100 rounded-lg text-sm font-bold">Back to Mapping</button>
             {step === "validation" ? (
-              <button data-testid="preview-button" onClick={() => setStep("preview")} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Preview Import</button>
+              <button data-testid="bulk-import-preview-button" onClick={() => setStep("preview")} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Preview Import</button>
             ) : (
-              <button data-testid="import-button" onClick={handleImport} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Import {eligibleRows.length} Rows</button>
+              <button data-testid="bulk-import-import-button" onClick={handleImport} disabled={eligibleRows.length === 0} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold disabled:bg-slate-200">Import {eligibleRows.length} Rows</button>
             )}
           </div>
         </Card>
@@ -217,12 +229,17 @@ const BulkImport: React.FC = () => {
 
       {step === "complete" && (
         <Card title="5. Import Result">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div data-testid="bulk-import-result" className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
             <Summary label="Imported" value={importedIds.length} />
             <Summary label="Skipped" value={validationResults.length - importedIds.length} />
             <Summary label="Warnings" value={counts.warning} />
             <Summary label="Errors" value={counts.error} />
           </div>
+          {importedIds.length > 0 && (
+            <div data-testid="bulk-import-success" className="mb-4 p-3 bg-green-50 border border-green-100 rounded-lg text-sm text-green-800">
+              Imported {importedIds.length} integration{importedIds.length === 1 ? "" : "s"} as drafts.
+            </div>
+          )}
           <div className="space-y-2">
             {importedIds.map(id => {
               const integration = state.integrations.find(item => item.id === id);
@@ -237,7 +254,7 @@ const BulkImport: React.FC = () => {
 };
 
 const IssueList = ({ issues }: { issues: { code: string; message: string; field?: string }[] }) => issues.length ? (
-  <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700">
+  <div data-testid="bulk-import-error" className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-700">
     {issues.map(issue => <p key={`${issue.code}-${issue.field || issue.message}`}>{issue.field ? `${issue.field}: ` : ""}{issue.message}</p>)}
   </div>
 ) : null;

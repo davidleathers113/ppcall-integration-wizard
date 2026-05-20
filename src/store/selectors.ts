@@ -15,6 +15,11 @@ export const selectLatestTestRunForIntegration = (state: AppState, integrationId
     .filter(testRun => testRun.integrationId === integrationId)
     .toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 
+export const selectTestRunsForIntegration = (state: AppState, integrationId: string) =>
+  state.testRuns
+    .filter(testRun => testRun.integrationId === integrationId)
+    .toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
 export const selectActivityForIntegration = (state: AppState, integrationId: string) =>
   state.activityEvents.filter(event => event.integrationId === integrationId);
 

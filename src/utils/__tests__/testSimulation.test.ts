@@ -68,4 +68,85 @@ describe("simulateIntegrationTest", () => {
     expect(simulateIntegrationTest({ ...publisher, config: { ...publisher.config, requiredFields: ["zip"] } }).status).toBe("failed");
     expect(simulateIntegrationTest({ ...publisher, config: { ...publisher.config, expiresInSeconds: undefined } }).status).toBe("failed");
   });
+
+  it("fails when dynamic destination mode lacks a parser path", () => {
+    const run = simulateIntegrationTest(
+      integration({ ...validRtbConfig, destinationMode: "dynamic_number_from_response", responseParsing: { acceptedPath: "$.accepted", acceptedValue: true, destinationNumberPath: "" } })
+    );
+    expect(run.status).toBe("failed");
+  });
+
+  it("warns when caps are not configured", () => {
+    const run = simulateIntegrationTest(integration(validRtbConfig));
+    const item = run.checklist.find(entry => entry.label === "Caps configured");
+    expect(item?.status).toBe("warning");
+  });
+
+  it("fails when a numeric cap is non-positive", () => {
+    const run = simulateIntegrationTest(
+      integration({ ...validRtbConfig, caps: { daily: 0 } })
+    );
+    expect(run.status).toBe("failed");
+    expect(run.checklist.some(item => item.label === "Caps valid" && item.status === "fail")).toBe(true);
+  });
+
+  it("fails when restrict duplicates mode lacks a window", () => {
+    const run = simulateIntegrationTest(
+      integration({ ...validRtbConfig, duplicateRules: { mode: "restrict" } })
+    );
+    expect(run.status).toBe("failed");
+  });
+
+  it("passes when restrict duplicates includes a positive window", () => {
+    const run = simulateIntegrationTest(
+      integration({ ...validRtbConfig, duplicateRules: { mode: "restrict", windowMinutes: 30 } })
+    );
+    expect(run.status).toBe("passed");
+  });
+
+  it("fails when schedule omits a timezone", () => {
+    const run = simulateIntegrationTest(
+      integration({
+        ...validRtbConfig,
+        schedule: { timezone: "", days: ["Mon"], startTime: "09:00", endTime: "17:00" }
+      })
+    );
+    expect(run.status).toBe("failed");
+  });
+
+  it("warns when schedule is always open", () => {
+    const run = simulateIntegrationTest(
+      integration({
+        ...validRtbConfig,
+        schedule: { timezone: "UTC", days: [], startTime: "00:00", endTime: "23:59", mode: "always_open" }
+      })
+    );
+    expect(run.checklist.some(item => item.label === "Schedule" && item.status === "warning")).toBe(true);
+  });
+
+  it("fails when revenue override has no payout or bid path", () => {
+    const run = simulateIntegrationTest(
+      integration({ ...validRtbConfig, revenueSettings: { mode: "override" } })
+    );
+    expect(run.status).toBe("failed");
+  });
+
+  it("warns when recording is disabled", () => {
+    const run = simulateIntegrationTest(
+      integration({ ...validRtbConfig, recordingSettings: { mode: "disabled" } })
+    );
+    expect(run.checklist.some(item => item.label === "Call recording" && item.status === "warning")).toBe(true);
+  });
+
+  it("supports legacy configs without advanced fields (backward compat)", () => {
+    const legacyConfig = {
+      method: "POST" as const,
+      url: "https://legacy.example/ping",
+      requestBody: { caller_id: "{{caller_id}}", zip: "{{zip}}" },
+      responseParsing: { acceptedPath: "$.accepted", acceptedValue: true, destinationNumberPath: "$.phone_number" },
+      timeoutSeconds: 3
+    };
+    const run = simulateIntegrationTest(integration(legacyConfig));
+    expect(run.status).toBe("passed");
+  });
 });
