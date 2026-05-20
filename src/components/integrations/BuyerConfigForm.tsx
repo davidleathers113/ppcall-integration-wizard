@@ -15,6 +15,7 @@ import type {
   IntegrationCaps,
   IntegrationConfig,
   IntegrationSchedule,
+  IntegrationScheduleDayRule,
   PredictiveRoutingConfig,
   RecordingSettings,
   RequestConfig,
@@ -940,7 +941,7 @@ const CapsScheduleSection: React.FC<{
             options={TIMEZONE_OPTIONS.map(tz => ({ value: tz, label: tz }))}
           />
         </div>
-        {(schedule?.mode || "basic") !== "always_open" && (
+        {(schedule?.mode || "basic") === "basic" && (
           <div className="space-y-3">
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase mb-1">Days</p>
@@ -978,8 +979,76 @@ const CapsScheduleSection: React.FC<{
             </div>
           </div>
         )}
+        {(schedule?.mode || "basic") === "advanced" && (
+          <AdvancedScheduleEditor schedule={schedule} updateSchedule={updateSchedule} />
+        )}
       </div>
     </section>
+  );
+};
+
+const AdvancedScheduleEditor: React.FC<{
+  schedule?: IntegrationSchedule;
+  updateSchedule: (partial: Partial<IntegrationSchedule>) => void;
+}> = ({ schedule, updateSchedule }) => {
+  const dayRules = WEEKDAYS.map(day => {
+    const existing = schedule?.dayRules?.find(rule => rule.day === day);
+    return (
+      existing || {
+        day,
+        enabled: false,
+        startTime: schedule?.startTime || "09:00",
+        endTime: schedule?.endTime || "17:00",
+      }
+    );
+  });
+  const updateRule = (day: string, partial: Partial<IntegrationScheduleDayRule>) => {
+    const next = dayRules.map(rule => (rule.day === day ? { ...rule, ...partial } : rule));
+    updateSchedule({ dayRules: next });
+  };
+  return (
+    <div data-testid="schedule-advanced-editor" className="space-y-2">
+      <p className="text-xs font-bold text-slate-500 uppercase">Per-day hours</p>
+      <p className="text-[11px] text-slate-500 italic">
+        Enable the days this buyer accepts calls and set per-day open/close times.
+      </p>
+      <div className="border rounded-lg divide-y divide-slate-100">
+        {dayRules.map(rule => (
+          <div
+            key={rule.day}
+            data-testid={`schedule-day-rule-${rule.day}`}
+            className="flex flex-wrap items-center gap-3 p-2"
+          >
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 w-20">
+              <input
+                data-testid={`schedule-day-rule-${rule.day}-enabled`}
+                type="checkbox"
+                checked={rule.enabled}
+                onChange={event => updateRule(rule.day, { enabled: event.target.checked })}
+              />
+              {rule.day}
+            </label>
+            <input
+              data-testid={`schedule-day-rule-${rule.day}-start`}
+              className="p-1.5 border rounded text-xs font-mono"
+              placeholder="09:00"
+              value={rule.startTime || ""}
+              disabled={!rule.enabled}
+              onChange={event => updateRule(rule.day, { startTime: event.target.value })}
+            />
+            <span className="text-xs text-slate-400">to</span>
+            <input
+              data-testid={`schedule-day-rule-${rule.day}-end`}
+              className="p-1.5 border rounded text-xs font-mono"
+              placeholder="17:00"
+              value={rule.endTime || ""}
+              disabled={!rule.enabled}
+              onChange={event => updateRule(rule.day, { endTime: event.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -1397,12 +1466,26 @@ const ShareableTagsSection: React.FC<{
   updateShareableTags: (next: ShareableTagsConfig) => void;
 }> = ({ shareableTags, updateShareableTags }) => {
   const selectedTags = new Set(shareableTags.tags || []);
+  const [customTagInput, setCustomTagInput] = useState("");
   const toggleTag = (tag: string) => {
     const next = new Set(selectedTags);
     if (next.has(tag)) next.delete(tag);
     else next.add(tag);
     updateShareableTags({ ...shareableTags, tags: Array.from(next) });
   };
+  const addCustomTag = () => {
+    const trimmed = customTagInput.trim();
+    if (!trimmed) return;
+    if (!selectedTags.has(trimmed)) {
+      const next = Array.from(selectedTags);
+      next.push(trimmed);
+      updateShareableTags({ ...shareableTags, tags: next });
+    }
+    setCustomTagInput("");
+  };
+  const customTags = (shareableTags.tags || []).filter(
+    tag => !SHAREABLE_TAG_FIELDS.includes(tag as (typeof SHAREABLE_TAG_FIELDS)[number])
+  );
   return (
     <section className="space-y-4">
       <SectionHeader
@@ -1451,6 +1534,57 @@ const ShareableTagsSection: React.FC<{
                   {tag}
                 </label>
               ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Custom Tags</p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {customTags.length === 0 && (
+                <p data-testid="shareable-custom-tags-empty" className="text-[11px] text-slate-400 italic">
+                  No custom tags yet.
+                </p>
+              )}
+              {customTags.map(tag => (
+                <span
+                  key={tag}
+                  data-testid={`shareable-custom-tag-${tag}`}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 border border-purple-100 rounded text-xs text-purple-700 font-mono"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    data-testid={`shareable-custom-tag-remove-${tag}`}
+                    onClick={() => toggleTag(tag)}
+                    className="text-purple-400 hover:text-purple-700"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                data-testid="shareable-custom-tag-input"
+                className="flex-1 p-2 border rounded text-xs font-mono"
+                placeholder="e.g. lead_score"
+                value={customTagInput}
+                onChange={event => setCustomTagInput(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addCustomTag();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                data-testid="shareable-custom-tag-add"
+                onClick={addCustomTag}
+                className="px-3 py-2 bg-purple-600 text-white rounded text-xs font-bold disabled:bg-slate-200"
+                disabled={!customTagInput.trim()}
+              >
+                Add
+              </button>
             </div>
           </div>
         </div>

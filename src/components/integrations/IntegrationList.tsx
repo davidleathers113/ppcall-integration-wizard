@@ -3,6 +3,7 @@ import { ArrowRight, ArrowLeft, Terminal, ExternalLink } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { calculateFreshnessStatus } from "../../utils/freshness";
+import { formatIntegrationTypeLabel } from "../../utils/buyerConfigDefaults";
 import { useAppContext } from "../../store/AppStore";
 
 interface IntegrationListProps {
@@ -55,7 +56,7 @@ const IntegrationList: React.FC<IntegrationListProps> = ({ onSelectIntegration }
                   <td className="px-6 py-4 text-sm text-slate-600">
                     <div className="flex items-center gap-1">
                       <Terminal size={12} className="text-slate-400" />
-                      {int.type.toUpperCase()}
+                      <span data-testid="integration-type-label">{formatIntegrationTypeLabel(int)}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">

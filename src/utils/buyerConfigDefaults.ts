@@ -126,6 +126,21 @@ export function isDirectTargetKind(kind: BuyerDestinationKind): boolean {
   return kind === "direct_number" || kind === "direct_sip";
 }
 
+export function formatIntegrationTypeLabel(
+  integration: Pick<Integration, "type" | "config" | "direction">
+): string {
+  if (integration.direction === "buyer") {
+    const kind = inferBuyerDestinationKind(integration);
+    if (kind === "direct_number") return "Direct Number Target";
+    if (kind === "direct_sip") return "Direct SIP Target";
+    if (kind === "rtb") return "RTB / Ping-Post Target";
+    if (kind === "webhook") return "Webhook Target";
+    if (kind === "generic_api") return "Generic API Target";
+  }
+  // Fallback for publishers and unknown buyer kinds — spaces between segments.
+  return integration.type.split("_").join(" ");
+}
+
 export function inferCallHandling(config: IntegrationConfig): CallHandlingConfig {
   return (
     config.callHandling ?? {

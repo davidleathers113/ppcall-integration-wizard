@@ -250,6 +250,26 @@ export function validateSchedule(schedule: IntegrationSchedule | undefined): Val
       });
     }
   }
+  if (schedule.mode === "advanced") {
+    const dayRules = schedule.dayRules || [];
+    const anyEnabled = dayRules.some(rule => rule.enabled);
+    if (!anyEnabled) {
+      issues.push({
+        field: "schedule.dayRules",
+        severity: "error",
+        message: "Advanced schedule requires at least one enabled day.",
+      });
+    }
+    for (const rule of dayRules) {
+      if (rule.enabled && (!rule.startTime || !rule.endTime)) {
+        issues.push({
+          field: `schedule.dayRules.${rule.day}`,
+          severity: "error",
+          message: `Advanced schedule day '${rule.day}' is enabled but missing open or close time.`,
+        });
+      }
+    }
+  }
   return issues;
 }
 

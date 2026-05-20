@@ -55,7 +55,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
     if (direction === "publisher") {
       return {
         ...config,
-        publisherId: config.publisherId || `pub_${(integrationName || "draft").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "draft"}`,
+        publisherId: config.publisherId || `pub_${slugify(integrationName || "draft") || "draft"}`,
         postingUrl: config.postingUrl || `https://mock-ppcall.local/rtb/${campaignId || "campaign"}/publisher`,
         requiredFields: config.requiredFields?.length ? config.requiredFields : ["caller_id", "zip"],
         acceptedResponse: config.acceptedResponse || { accepted: true, phone_number: "+18005551212", payout: 35, expires_in_seconds: config.expiresInSeconds || 30 },
@@ -322,7 +322,9 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
                 <p className="text-[11px] text-slate-500 italic">Use country code format, such as +12223334444.</p>
                 <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
                 <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
+                <DirectCallHandlingFields config={normalizedConfig} setConfig={setConfig} />
                 <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
+                <DirectDuplicateRulesField config={normalizedConfig} setConfig={setConfig} />
               </>
             ) : buyerKind === "direct_sip" ? (
               <>
@@ -334,9 +336,12 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete,
                   }));
                 }} />
                 <p className="text-[11px] text-slate-500 italic">Use a SIP URI such as sip:buyer@example.com.</p>
+                <DirectSipHeadersField config={normalizedConfig} setConfig={setConfig} />
                 <NumberField label="Payout" value={normalizedConfig.payout || 0} onChange={value => updateConfig("payout", value)} />
                 <NumberField label="Conversion Duration Seconds" value={normalizedConfig.conversionDurationSeconds || 0} onChange={value => updateConfig("conversionDurationSeconds", value)} />
+                <DirectCallHandlingFields config={normalizedConfig} setConfig={setConfig} />
                 <DirectScheduleAndCapFields config={normalizedConfig} setConfig={setConfig} />
+                <DirectDuplicateRulesField config={normalizedConfig} setConfig={setConfig} />
               </>
             ) : type === "static_number" ? (
               <>
@@ -474,7 +479,7 @@ function buildConfigWithDefaultChild(config: IntegrationConfig, direction: Integ
       publisherSources: [{
         id: createId("src"),
         name: `${name} Default Source`,
-        publisherId: config.publisherId || `pub_${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+        publisherId: config.publisherId || `pub_${slugify(name)}`,
         sourceId: "default",
         status: "draft",
         requiredFields: config.requiredFields || ["caller_id", "zip"],
@@ -523,6 +528,159 @@ const NumberField = ({ label, value, onChange }: { label: string; value: number;
     <input type="number" className="mt-1 w-full p-2 border rounded-lg text-sm normal-case" value={value || ""} onChange={event => onChange(Number(event.target.value))} />
   </label>
 );
+
+function slugify(value: string): string {
+  // Lowercase, then collapse any run of non [a-z0-9] into single underscores,
+  // and trim leading/trailing underscores. String-method based, no regex.
+  const lowered = value.toLowerCase();
+  let result = "";
+  let lastWasUnderscore = true; // suppress leading underscores
+  for (const ch of lowered) {
+    const isAllowed = (ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9");
+    if (isAllowed) {
+      result += ch;
+      lastWasUnderscore = false;
+    } else if (!lastWasUnderscore) {
+      result += "_";
+      lastWasUnderscore = true;
+    }
+  }
+  // Trim trailing underscore.
+  if (result.endsWith("_")) result = result.substring(0, result.length - 1);
+  return result;
+}
+
+const DirectCallHandlingFields = ({ config, setConfig }: { config: IntegrationConfig; setConfig: React.Dispatch<React.SetStateAction<Partial<IntegrationConfig>>> }) => {
+  const timeout = config.callHandling?.connectionTimeoutSeconds ?? 30;
+  return (
+    <div className="pt-2">
+      <label className="block text-xs font-bold text-slate-500 uppercase">Connection Timeout (seconds)
+        <input
+          type="number"
+          data-testid="wizard-direct-connection-timeout"
+          className="mt-1 w-full p-2 border rounded-lg text-sm normal-case"
+          value={timeout || ""}
+          onChange={event => {
+            const next = Number(event.target.value);
+            setConfig(current => ({
+              ...current,
+              callHandling: {
+                ...(current.callHandling || {}),
+                connectionTimeoutSeconds: next > 0 ? next : undefined,
+              },
+            }));
+          }}
+        />
+      </label>
+    </div>
+  );
+};
+
+const DirectDuplicateRulesField = ({ config, setConfig }: { config: IntegrationConfig; setConfig: React.Dispatch<React.SetStateAction<Partial<IntegrationConfig>>> }) => {
+  const mode = config.duplicateRules?.mode ?? "buyer_default";
+  const windowMinutes = config.duplicateRules?.windowMinutes ?? 0;
+  return (
+    <div className="pt-2 space-y-2">
+      <label className="block text-xs font-bold text-slate-500 uppercase">Duplicate Rules
+        <select
+          data-testid="wizard-direct-duplicate-mode"
+          className="mt-1 w-full p-2 border rounded-lg text-sm bg-white normal-case"
+          value={mode}
+          onChange={event => {
+            const nextMode = event.target.value as "campaign_default" | "buyer_default" | "do_not_restrict" | "restrict";
+            setConfig(current => ({
+              ...current,
+              duplicateRules: {
+                mode: nextMode,
+                windowMinutes:
+                  nextMode === "restrict"
+                    ? current.duplicateRules?.windowMinutes ?? 60
+                    : undefined,
+              },
+            }));
+          }}
+        >
+          <option value="campaign_default">Campaign default</option>
+          <option value="buyer_default">Buyer default</option>
+          <option value="do_not_restrict">Do not restrict</option>
+          <option value="restrict">Restrict</option>
+        </select>
+      </label>
+      {mode === "restrict" && (
+        <label className="block text-xs font-bold text-slate-500 uppercase">Duplicate Window (minutes)
+          <input
+            type="number"
+            data-testid="wizard-direct-duplicate-window"
+            className="mt-1 w-full p-2 border rounded-lg text-sm normal-case"
+            value={windowMinutes || ""}
+            onChange={event => {
+              const next = Number(event.target.value);
+              setConfig(current => ({
+                ...current,
+                duplicateRules: {
+                  mode: "restrict",
+                  windowMinutes: next > 0 ? next : undefined,
+                },
+              }));
+            }}
+          />
+        </label>
+      )}
+    </div>
+  );
+};
+
+const DirectSipHeadersField = ({ config, setConfig }: { config: IntegrationConfig; setConfig: React.Dispatch<React.SetStateAction<Partial<IntegrationConfig>>> }) => {
+  const initial = JSON.stringify(config.destination?.sipHeaders || {}, null, 2);
+  const [text, setText] = React.useState(initial);
+  const [error, setError] = React.useState<string | null>(null);
+  const apply = () => {
+    try {
+      const parsed = JSON.parse(text || "{}") as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Expected a JSON object.");
+      }
+      const stringRecord: Record<string, string> = {};
+      for (const [headerKey, value] of Object.entries(parsed as Record<string, unknown>)) {
+        stringRecord[headerKey] = String(value);
+      }
+      setConfig(current => ({
+        ...current,
+        destination: { ...(current.destination || {}), sipHeaders: stringRecord },
+      }));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid JSON object.");
+    }
+  };
+  return (
+    <div className="pt-2 space-y-1">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-slate-500 uppercase">SIP Headers (JSON, optional)</p>
+        <button
+          type="button"
+          data-testid="wizard-direct-sip-headers-apply"
+          onClick={apply}
+          className="text-xs text-purple-600 font-bold"
+        >
+          Apply
+        </button>
+      </div>
+      <textarea
+        data-testid="wizard-direct-sip-headers"
+        className="w-full h-20 p-3 bg-slate-900 text-blue-300 rounded-lg text-xs font-mono"
+        value={text}
+        onChange={event => setText(event.target.value)}
+        spellCheck={false}
+      />
+      {error && (
+        <p data-testid="wizard-direct-sip-headers-error" className="text-xs text-red-600">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+};
 
 const DirectScheduleAndCapFields = ({ config, setConfig }: { config: IntegrationConfig; setConfig: React.Dispatch<React.SetStateAction<Partial<IntegrationConfig>>> }) => {
   const timezone = config.schedule?.timezone || "America/New_York";

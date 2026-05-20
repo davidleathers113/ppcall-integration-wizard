@@ -523,6 +523,119 @@ export const MOCK_INTEGRATIONS: Integration[] = [
     lastSuccessfulTestAt: "2026-03-21T11:30:00Z",
     usageCount: 0,
     errorRate: 0.0
+  },
+  {
+    id: "int_direct_number_acme",
+    campaignId: "camp_hvac",
+    name: "Acme HVAC Direct Number",
+    direction: "buyer",
+    type: "static_number",
+    platformPreset: "direct_number",
+    status: "active",
+    config: {
+      buyerDestinationKind: "direct_number",
+      destinationMode: "static_number",
+      destination: { number: "+18005551313" },
+      destinationNumber: "+18005551313",
+      callHandling: {
+        connectionTimeoutSeconds: 30,
+        revenueRecovery: "buyer_default"
+      },
+      recordingSettings: { mode: "account_default" },
+      schedule: {
+        timezone: "America/New_York",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        startTime: "08:00",
+        endTime: "18:00",
+        mode: "basic"
+      },
+      caps: {
+        capOn: "converted_calls",
+        daily: 150,
+        concurrency: 6
+      },
+      capUsage: {
+        dailyUsed: 47,
+        currentConcurrency: 2
+      },
+      duplicateRules: { mode: "buyer_default" },
+      shareableTags: { mode: "buyer_default" },
+      predictiveRouting: {
+        mode: "campaign_default",
+        priorityBump: 0
+      },
+      payout: 38,
+      conversionDurationSeconds: 120
+    },
+    createdAt: "2026-04-02T09:00:00Z",
+    createdBy: "Sarah",
+    updatedAt: "2026-04-02T09:00:00Z",
+    updatedBy: "Sarah",
+    activatedAt: "2026-04-02T10:00:00Z",
+    lastTestedAt: "2026-04-02T09:30:00Z",
+    lastSuccessfulTestAt: "2026-04-02T09:30:00Z",
+    lastUsedAt: "2026-05-19T13:00:00Z",
+    usageCount: 412,
+    errorRate: 0.01
+  },
+  {
+    id: "int_direct_sip_intake",
+    campaignId: "camp_ssdi",
+    name: "Disability Intake Direct SIP",
+    direction: "buyer",
+    type: "sip",
+    platformPreset: "direct_sip",
+    status: "test_passed",
+    config: {
+      buyerDestinationKind: "direct_sip",
+      destinationMode: "static_sip",
+      destination: {
+        sipAddress: "sip:intake@disability-intake.example",
+        sipHeaders: { "X-Source": "ppcall-studio" }
+      },
+      sipAddress: "sip:intake@disability-intake.example",
+      callHandling: {
+        connectionTimeoutSeconds: 25,
+        revenueRecovery: "buyer_default"
+      },
+      recordingSettings: { mode: "enabled" },
+      schedule: {
+        timezone: "America/Chicago",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        startTime: "09:00",
+        endTime: "20:00",
+        mode: "basic"
+      },
+      caps: {
+        capOn: "converted_calls",
+        daily: 75,
+        concurrency: 4
+      },
+      capUsage: {
+        dailyUsed: 0,
+        currentConcurrency: 0
+      },
+      duplicateRules: { mode: "restrict", windowMinutes: 1440 },
+      shareableTags: {
+        mode: "override",
+        shareInboundCallId: true,
+        tags: ["caller_id", "zip", "state"]
+      },
+      predictiveRouting: {
+        mode: "estimated_revenue",
+        priorityBump: 2
+      },
+      payout: 42,
+      conversionDurationSeconds: 150
+    },
+    createdAt: "2026-05-10T10:00:00Z",
+    createdBy: "Sarah",
+    updatedAt: "2026-05-10T10:00:00Z",
+    updatedBy: "Sarah",
+    lastTestedAt: "2026-05-10T10:15:00Z",
+    lastSuccessfulTestAt: "2026-05-10T10:15:00Z",
+    usageCount: 0,
+    errorRate: 0
   }
 ];
 

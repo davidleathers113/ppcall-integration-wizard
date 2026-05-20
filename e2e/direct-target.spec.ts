@@ -245,6 +245,36 @@ test.describe('Direct Target Mode', () => {
     expect(lowered.includes('active')).toBe(false);
   });
 
+  test('CSV import with status=active downgrades the direct target to needs_testing', async ({
+    page,
+  }) => {
+    const csv =
+      'integration_name,campaign,direction,type,buyer_destination_kind,target_mode,number,connection_timeout_seconds,daily_cap,concurrency_cap,schedule_timezone,schedule_mode,payout,conversion_duration_seconds,status\n' +
+      'E2E CSV Active Downgrade,HVAC Inbound,buyer,static_number,direct_number,number,+18005551414,30,100,5,America/New_York,always_open,35,120,active';
+
+    await navigateTo(page, 'Bulk Import');
+    await page.getByTestId('bulk-import-mode-csv').click();
+    await page.getByTestId('bulk-import-textarea').fill(csv);
+    await page.getByTestId('bulk-import-parse-button').click();
+    const validateButton = page.getByTestId('bulk-import-validate-button');
+    if (await validateButton.isVisible().catch(() => false)) {
+      await validateButton.click();
+    }
+    // Row will have a "warning" severity (active_downgraded). Opt-in so it
+    // becomes eligible for preview/import.
+    await page.getByTestId('bulk-import-include-warnings').check();
+    await page.getByTestId('bulk-import-preview-button').click();
+    await page.getByTestId('bulk-import-import-button').click();
+    await expect(page.getByTestId('bulk-import-result')).toBeVisible();
+
+    await navigateTo(page, 'Integrations');
+    await page.getByRole('button', { name: 'E2E CSV Active Downgrade' }).first().click();
+    await expect(page.getByTestId('integration-detail-page')).toBeVisible();
+    const status = (await page.getByTestId('integration-status').textContent()) || '';
+    const normalized = status.toLowerCase().split(' ').join('');
+    expect(normalized.includes('active')).toBe(false);
+  });
+
   test('AI Assistant produces a Direct Number proposal from natural-language input', async ({
     page,
   }) => {

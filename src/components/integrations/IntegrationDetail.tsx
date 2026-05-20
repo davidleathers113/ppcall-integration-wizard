@@ -15,6 +15,7 @@ import {
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { calculateFreshnessStatus, getDaysSince, getFreshnessDetails } from "../../utils/freshness";
+import { formatIntegrationTypeLabel } from "../../utils/buyerConfigDefaults";
 import { useAppContext } from "../../store/AppStore";
 import { useAppActions } from "../../store/useAppActions";
 import { selectActivityForIntegration, selectLatestTestRunForIntegration } from "../../store/selectors";
@@ -92,7 +93,7 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
                 </div>
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                   <span className="text-sm text-slate-500">Type</span>
-                  <span className="text-sm font-semibold capitalize">{integration.type.replace('_', ' ')}</span>
+                  <span data-testid="integration-detail-type-label" className="text-sm font-semibold">{formatIntegrationTypeLabel(integration)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                   <span className="text-sm text-slate-500">Preset</span>

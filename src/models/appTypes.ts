@@ -47,6 +47,13 @@ export interface IntegrationScheduleBreak {
   endTime: string;
 }
 
+export interface IntegrationScheduleDayRule {
+  day: string;
+  enabled: boolean;
+  startTime?: string;
+  endTime?: string;
+}
+
 export interface IntegrationSchedule {
   timezone: string;
   days: string[];
@@ -54,6 +61,7 @@ export interface IntegrationSchedule {
   endTime: string;
   mode?: "always_open" | "basic" | "advanced";
   breaks?: IntegrationScheduleBreak[];
+  dayRules?: IntegrationScheduleDayRule[];
 }
 
 export type DestinationMode =

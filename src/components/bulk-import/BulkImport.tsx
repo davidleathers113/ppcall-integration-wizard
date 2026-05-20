@@ -206,7 +206,12 @@ const BulkImport: React.FC = () => {
             <Badge variant="warning">{counts.warning} warnings</Badge>
             <Badge variant="error">{counts.error} errors</Badge>
             <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" checked={includeWarnings} onChange={event => setIncludeWarnings(event.target.checked)} />
+              <input
+                data-testid="bulk-import-include-warnings"
+                type="checkbox"
+                checked={includeWarnings}
+                onChange={event => setIncludeWarnings(event.target.checked)}
+              />
               Include rows with warnings
             </label>
           </div>
