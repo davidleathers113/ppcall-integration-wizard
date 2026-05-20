@@ -1,0 +1,2 @@
+integration_name,campaign,direction,type,platform_preset,method,url,timeout_seconds,required_fields,accepted_path,accepted_value,destination_number_path,bid_path,conversion_duration_path,reject_reason_path
+Premier RTB,HVAC Inbound,buyer,rtb,ringba_rtb,POST,https://buyer.example/ping,3,"caller_id,zip",$.accepted,true,$.phone_number,$.bid,$.duration,$.reason

@@ -126,7 +126,7 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
               <div className="space-y-6">
                 {testRun?.checklist.some(item => item.status === "fail") && (
                   <div className="p-4 rounded-xl bg-red-50 border border-red-100">
-                    <p className="text-sm font-bold text-red-900">Failed Checks</p>
+                    <p className="text-sm font-bold text-red-900">Suggested Fixes</p>
                     <ul className="mt-2 space-y-1 text-xs text-red-700">
                       {testRun?.checklist.filter(item => item.status === "fail").map(item => (
                         <li key={item.label}>{item.label}: {item.message}</li>
@@ -185,47 +185,47 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
                     )}
                   </div>
 
+                  <JsonSection
+                    id="tokens"
+                    title="Resolved Tokens"
+                    icon={<Info size={16} className="text-slate-400" />}
+                    expandedSection={expandedSection}
+                    setExpandedSection={setExpandedSection}
+                    value={inputTokens}
+                    textClassName="text-amber-300"
+                  />
+
                   {/* Request Preview */}
-                  <div className="border rounded-lg overflow-hidden">
-                    <button 
-                      onClick={() => setExpandedSection(expandedSection === "request" ? null : "request")}
-                      className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 font-semibold text-slate-900">
-                        <Terminal size={16} className="text-slate-400" />
-                        Request Preview
-                      </div>
-                      {expandedSection === "request" ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
-                    {expandedSection === "request" && (
-                      <div className="p-4 bg-slate-900">
-                        <pre className="text-xs text-green-400 overflow-auto max-h-64 whitespace-pre-wrap font-mono">
-                          {JSON.stringify(testRun?.requestPreview, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
+                  <JsonSection
+                    id="request"
+                    title="Request Preview"
+                    icon={<Terminal size={16} className="text-slate-400" />}
+                    expandedSection={expandedSection}
+                    setExpandedSection={setExpandedSection}
+                    value={testRun?.requestPreview}
+                    textClassName="text-green-400"
+                  />
 
                   {/* Raw Response */}
-                  <div className="border rounded-lg overflow-hidden">
-                    <button 
-                      onClick={() => setExpandedSection(expandedSection === "response" ? null : "response")}
-                      className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 font-semibold text-slate-900">
-                        <Info size={16} className="text-slate-400" />
-                        Raw Response
-                      </div>
-                      {expandedSection === "response" ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
-                    {expandedSection === "response" && (
-                      <div className="p-4 bg-slate-900">
-                        <pre className="text-xs text-blue-300 overflow-auto max-h-64 whitespace-pre-wrap font-mono">
-                          {JSON.stringify(testRun?.rawResponse, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
+                  <JsonSection
+                    id="response"
+                    title="Raw Response"
+                    icon={<Info size={16} className="text-slate-400" />}
+                    expandedSection={expandedSection}
+                    setExpandedSection={setExpandedSection}
+                    value={testRun?.rawResponse}
+                    textClassName="text-blue-300"
+                  />
+
+                  <JsonSection
+                    id="parsed"
+                    title="Parsed Result"
+                    icon={<CheckCircle2 size={16} className="text-slate-400" />}
+                    expandedSection={expandedSection}
+                    setExpandedSection={setExpandedSection}
+                    value={testRun?.parsedResult}
+                    textClassName="text-purple-300"
+                  />
                 </div>
               </div>
             )}
@@ -237,3 +237,41 @@ const TestConsole: React.FC<TestConsoleProps> = ({ overrideIntegrationId }) => {
 };
 
 export default TestConsole;
+
+const JsonSection = ({
+  id,
+  title,
+  icon,
+  expandedSection,
+  setExpandedSection,
+  value,
+  textClassName
+}: {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  expandedSection: string | null;
+  setExpandedSection: React.Dispatch<React.SetStateAction<string | null>>;
+  value: unknown;
+  textClassName: string;
+}) => (
+  <div className="border rounded-lg overflow-hidden">
+    <button
+      onClick={() => setExpandedSection(expandedSection === id ? null : id)}
+      className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+    >
+      <div className="flex items-center gap-2 font-semibold text-slate-900">
+        {icon}
+        {title}
+      </div>
+      {expandedSection === id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+    </button>
+    {expandedSection === id && (
+      <div className="p-4 bg-slate-900">
+        <pre className={`text-xs overflow-auto max-h-64 whitespace-pre-wrap font-mono ${textClassName}`}>
+          {JSON.stringify(value, null, 2)}
+        </pre>
+      </div>
+    )}
+  </div>
+);

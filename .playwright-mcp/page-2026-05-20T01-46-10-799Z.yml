@@ -1,0 +1,683 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - heading "PPCall Studio" [level=1] [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e9]: PPCall Studio
+    - navigation [ref=e10]:
+      - list [ref=e11]:
+        - listitem [ref=e12]:
+          - button "Dashboard" [ref=e13]:
+            - img [ref=e14]
+            - text: Dashboard
+        - listitem [ref=e19]:
+          - button "Campaigns" [ref=e20]:
+            - img [ref=e21]
+            - text: Campaigns
+        - listitem [ref=e25]:
+          - button "Integrations" [ref=e26]:
+            - img [ref=e27]
+            - text: Integrations
+        - listitem [ref=e29]:
+          - button "Add Integration" [ref=e30]:
+            - img [ref=e31]
+            - text: Add Integration
+        - listitem [ref=e33]:
+          - button "Bulk Import" [ref=e34]:
+            - img [ref=e35]
+            - text: Bulk Import
+        - listitem [ref=e38]:
+          - button "Test Console" [ref=e39]:
+            - img [ref=e40]
+            - text: Test Console
+        - listitem [ref=e42]:
+          - button "AI Assistant" [ref=e43]:
+            - img [ref=e44]
+            - text: AI Assistant
+        - listitem [ref=e47]:
+          - button "Developer/API" [ref=e48]:
+            - img [ref=e49]
+            - text: Developer/API
+        - listitem [ref=e54]:
+          - button "Activity" [ref=e55]:
+            - img [ref=e56]
+            - text: Activity
+    - generic [ref=e60]:
+      - paragraph [ref=e61]: Mock Environment v1.0
+      - paragraph [ref=e62]: © 2026 Self-Service PPCall Integration Studio
+  - main [ref=e63]:
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - generic [ref=e67]:
+          - heading "Bulk Import" [level=2] [ref=e68]
+          - paragraph [ref=e69]: Import CSV or JSON into normalized draft integrations. Max 50 rows.
+        - generic [ref=e70]:
+          - combobox [ref=e71]:
+            - option "Buyer RTB CSV" [selected]
+            - option "Static Buyer CSV"
+            - option "Publisher RTB CSV"
+            - option "Mixed CSV"
+            - option "JSON"
+          - button "Copy Template" [ref=e72]
+          - button "Download" [ref=e73]:
+            - img [ref=e74]
+            - text: Download
+      - generic [ref=e77]:
+        - generic [ref=e78]: 1. source
+        - generic [ref=e79]: 2. mapping
+        - generic [ref=e80]: 3. validation
+        - generic [ref=e81]: 4. preview
+        - generic [ref=e82]: 5. complete
+      - generic [ref=e83]: Parsed 1 row.
+      - generic [ref=e84]:
+        - img [ref=e85]
+        - generic [ref=e88]: buyer-rtb-template.csv • 0.3 KB
+      - generic [ref=e89]:
+        - generic [ref=e91]:
+          - heading "2. Map Columns" [level=3] [ref=e92]
+          - paragraph [ref=e93]: Auto-map headers to import schema fields
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - button "Auto-map Columns" [ref=e96]
+            - button "Reset Mappings" [ref=e97]
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - generic [ref=e100]:
+                - paragraph [ref=e101]: integration_name
+                - paragraph [ref=e102]: 100% confidence
+              - combobox [ref=e103]:
+                - option "Ignore column"
+                - option "Integration Name *" [selected]
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e104]:
+              - generic [ref=e105]:
+                - paragraph [ref=e106]: campaign
+                - paragraph [ref=e107]: 100% confidence
+              - combobox [ref=e108]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *" [selected]
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - paragraph [ref=e111]: direction
+                - paragraph [ref=e112]: 100% confidence
+              - combobox [ref=e113]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *" [selected]
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - paragraph [ref=e116]: type
+                - paragraph [ref=e117]: 100% confidence
+              - combobox [ref=e118]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *" [selected]
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e119]:
+              - generic [ref=e120]:
+                - paragraph [ref=e121]: platform_preset
+                - paragraph [ref=e122]: 100% confidence
+              - combobox [ref=e123]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset" [selected]
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e124]:
+              - generic [ref=e125]:
+                - paragraph [ref=e126]: method
+                - paragraph [ref=e127]: 100% confidence
+              - combobox [ref=e128]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method" [selected]
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e129]:
+              - generic [ref=e130]:
+                - paragraph [ref=e131]: url
+                - paragraph [ref=e132]: 100% confidence
+              - combobox [ref=e133]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL" [selected]
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - paragraph [ref=e136]: timeout_seconds
+                - paragraph [ref=e137]: 100% confidence
+              - combobox [ref=e138]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds" [selected]
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e139]:
+              - generic [ref=e140]:
+                - paragraph [ref=e141]: required_fields
+                - paragraph [ref=e142]: 100% confidence
+              - combobox [ref=e143]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields" [selected]
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e144]:
+              - generic [ref=e145]:
+                - paragraph [ref=e146]: accepted_path
+                - paragraph [ref=e147]: 100% confidence
+              - combobox [ref=e148]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path" [selected]
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e149]:
+              - generic [ref=e150]:
+                - paragraph [ref=e151]: accepted_value
+                - paragraph [ref=e152]: 100% confidence
+              - combobox [ref=e153]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value" [selected]
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e154]:
+              - generic [ref=e155]:
+                - paragraph [ref=e156]: destination_number_path
+                - paragraph [ref=e157]: 100% confidence
+              - combobox [ref=e158]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path" [selected]
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - paragraph [ref=e161]: bid_path
+                - paragraph [ref=e162]: 100% confidence
+              - combobox [ref=e163]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path" [selected]
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e164]:
+              - generic [ref=e165]:
+                - paragraph [ref=e166]: conversion_duration_path
+                - paragraph [ref=e167]: 100% confidence
+              - combobox [ref=e168]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path" [selected]
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path"
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - paragraph [ref=e171]: reject_reason_path
+                - paragraph [ref=e172]: 100% confidence
+              - combobox [ref=e173]:
+                - option "Ignore column"
+                - option "Integration Name *"
+                - option "Campaign *"
+                - option "Direction *"
+                - option "Type *"
+                - option "Platform Preset"
+                - option "Status"
+                - option "Method"
+                - option "URL"
+                - option "Destination Number"
+                - option "SIP Address"
+                - option "Publisher ID"
+                - option "Posting URL"
+                - option "Timeout Seconds"
+                - option "Expires In Seconds"
+                - option "Payout"
+                - option "Conversion Duration Seconds"
+                - option "Required Fields"
+                - option "Headers JSON"
+                - option "Query Params JSON"
+                - option "Request Body JSON"
+                - option "Accepted Path"
+                - option "Accepted Value"
+                - option "Destination Number Path"
+                - option "SIP Address Path"
+                - option "Bid Path"
+                - option "Conversion Duration Path"
+                - option "Expires Seconds Path"
+                - option "Reject Reason Path" [selected]
+                - option "Daily Cap"
+                - option "Hourly Cap"
+                - option "Schedule Timezone"
+                - option "Schedule Days"
+                - option "Schedule Start Time"
+                - option "Schedule End Time"
+          - button "Validate Rows" [ref=e175]

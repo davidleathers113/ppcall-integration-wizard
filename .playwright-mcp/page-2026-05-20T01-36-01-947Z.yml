@@ -1,0 +1,108 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - heading "PPCall Studio" [level=1] [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e9]: PPCall Studio
+    - navigation [ref=e10]:
+      - list [ref=e11]:
+        - listitem [ref=e12]:
+          - button "Dashboard" [ref=e13]:
+            - img [ref=e14]
+            - text: Dashboard
+        - listitem [ref=e19]:
+          - button "Campaigns" [ref=e20]:
+            - img [ref=e21]
+            - text: Campaigns
+        - listitem [ref=e25]:
+          - button "Integrations" [ref=e26]:
+            - img [ref=e27]
+            - text: Integrations
+        - listitem [ref=e29]:
+          - button "Add Integration" [ref=e30]:
+            - img [ref=e31]
+            - text: Add Integration
+        - listitem [ref=e33]:
+          - button "Bulk Import" [ref=e34]:
+            - img [ref=e35]
+            - text: Bulk Import
+        - listitem [ref=e38]:
+          - button "Test Console" [ref=e39]:
+            - img [ref=e40]
+            - text: Test Console
+        - listitem [ref=e42]:
+          - button "AI Assistant" [ref=e43]:
+            - img [ref=e44]
+            - text: AI Assistant
+        - listitem [ref=e47]:
+          - button "Developer/API" [ref=e48]:
+            - img [ref=e49]
+            - text: Developer/API
+        - listitem [ref=e54]:
+          - button "Activity" [ref=e55]:
+            - img [ref=e56]
+            - text: Activity
+    - generic [ref=e60]:
+      - paragraph [ref=e61]: Mock Environment v1.0
+      - paragraph [ref=e62]: © 2026 Self-Service PPCall Integration Studio
+  - main [ref=e63]:
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - heading "Platform Overview" [level=2] [ref=e67]
+        - paragraph [ref=e68]: Monitor your integration health and campaign performance.
+      - generic [ref=e69]:
+        - generic [ref=e72]:
+          - img [ref=e73]
+          - generic [ref=e76]: "2"
+          - generic [ref=e77]: Active
+        - generic [ref=e80]:
+          - img [ref=e81]
+          - generic [ref=e83]: "1"
+          - generic [ref=e84]: Need Testing
+        - generic [ref=e87]:
+          - img [ref=e88]
+          - generic [ref=e90]: "1"
+          - generic [ref=e91]: Failing
+        - generic [ref=e94]:
+          - img [ref=e95]
+          - generic [ref=e98]: "0"
+          - generic [ref=e99]: Stale/Dormant
+        - generic [ref=e102]:
+          - img [ref=e103]
+          - generic [ref=e106]: "3"
+          - generic [ref=e107]: Used This Week
+      - generic [ref=e108]:
+        - generic [ref=e110]:
+          - generic [ref=e112]:
+            - heading "Integration Health" [level=3] [ref=e113]
+            - paragraph [ref=e114]: Integrations requiring attention
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - generic [ref=e120]:
+                - paragraph [ref=e121]: Coastal Plumbing Buyer
+                - paragraph [ref=e122]: buyer • GENERIC_API
+              - generic [ref=e123]: failing
+            - generic [ref=e124]:
+              - generic [ref=e127]:
+                - paragraph [ref=e128]: SearchCalls Legal
+                - paragraph [ref=e129]: publisher • RTB
+              - generic [ref=e130]: needs testing
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - heading "Recent Activity" [level=3] [ref=e134]
+            - img [ref=e136]
+          - generic [ref=e141]:
+            - generic [ref=e145]:
+              - paragraph [ref=e146]: Sarah created Premier Home Services RTB.
+              - paragraph [ref=e147]: 1/11/2026, 6:00:00 AM
+            - generic [ref=e151]:
+              - paragraph [ref=e152]: Test passed in 412ms.
+              - paragraph [ref=e153]: 1/11/2026, 6:15:00 AM
+            - generic [ref=e157]:
+              - paragraph [ref=e158]: Integration activated.
+              - paragraph [ref=e159]: 1/12/2026, 5:00:00 AM
+            - generic [ref=e163]:
+              - paragraph [ref=e164]: "Integration failed: 404 Not Found from buyer endpoint."
+              - paragraph [ref=e165]: 5/18/2026, 6:05:00 AM
+            - generic [ref=e169]:
+              - paragraph [ref=e170]: "Integration marked stale: no traffic in 30+ days."
+              - paragraph [ref=e171]: 5/14/2026, 8:00:00 PM

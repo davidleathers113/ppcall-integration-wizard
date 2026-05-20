@@ -85,11 +85,19 @@ const DeveloperDocs: React.FC = () => {
   const actions = useAppActions();
   const [copied, setCopied] = useState<string | null>(null);
   const [activeExample, setActiveExample] = useState<keyof typeof examples>("Buyer RTB");
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const copyText = async (id: string, text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 1500);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(id);
+      setCopyError(null);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      setCopied(null);
+      setCopyError("Copy failed. Browser clipboard access is unavailable.");
+      setTimeout(() => setCopyError(null), 3000);
+    }
   };
 
   const exampleText = JSON.stringify(examples[activeExample], null, 2);
@@ -135,7 +143,15 @@ const DeveloperDocs: React.FC = () => {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Example Payloads" headerAction={<button onClick={() => copyText(activeExample, exampleText)} className="text-slate-400 hover:text-slate-600">{copied === activeExample ? <Check size={16} /> : <Copy size={16} />}</button>}>
+          <Card title="Example Payloads" headerAction={<button onClick={() => copyText(activeExample, exampleText)} aria-label={`Copy ${activeExample} payload`} className="text-slate-400 hover:text-slate-600">{copied === activeExample ? <Check size={16} /> : <Copy size={16} />}</button>}>
+            <div className="sr-only" aria-live="polite">
+              {copied ? "Payload copied." : copyError || ""}
+            </div>
+            {(copied || copyError) && (
+              <div className={`mb-3 rounded-lg border p-2 text-xs ${copyError ? "border-red-100 bg-red-50 text-red-700" : "border-green-100 bg-green-50 text-green-700"}`}>
+                {copyError || "Payload copied."}
+              </div>
+            )}
             <div className="flex gap-2 mb-4 overflow-x-auto">
               {Object.keys(examples).map(name => (
                 <button key={name} onClick={() => setActiveExample(name as keyof typeof examples)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${activeExample === name ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600"}`}>

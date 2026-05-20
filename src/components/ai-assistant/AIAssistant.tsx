@@ -172,14 +172,18 @@ function buildProposal(instructions: string): AIConfigProposal {
   const bidField = firstMatch(lower, ["bid", "payout", "price"]) || "payout";
   const rejectField = firstMatch(lower, ["rejection_reason", "reason", "message"]) || "reason";
   const expirationField = firstMatch(lower, ["expires_in_seconds", "expireinseconds", "expiration"]);
+  const publisherId = instructions.match(/\bpub[_-][a-z0-9_-]+\b/i)?.[0];
+  const expirationSeconds = Number(instructions.match(/\b(?:expires_in_seconds|expiration|expires?|expire)\D{0,20}(\d{2,5})\b/i)?.[1]);
   const warnings: string[] = [];
 
   if (!url && direction === "buyer" && type !== "static_number" && type !== "sip") warnings.push("No endpoint URL detected; using a placeholder URL.");
+  if (direction === "publisher" && !publisherId) warnings.push("No publisher ID detected; using a publisher_id token placeholder.");
   if (!requiredFields.includes("caller_id")) warnings.push("Caller ID was not detected; adding caller_id because PPCall flows generally require it.");
   if (!requiredFields.includes("zip") && direction === "buyer" && type === "rtb") warnings.push("ZIP was not detected; RTB examples often require zip.");
 
   const fields = Array.from(new Set(requiredFields.length ? requiredFields : ["caller_id", "zip"]));
   const tokenBody = Object.fromEntries(fields.map(field => [field, `{{${field}}}`]));
+  const expiresInSeconds = Number.isFinite(expirationSeconds) && expirationSeconds > 0 ? expirationSeconds : 30;
 
   if (direction === "publisher") {
     return {
@@ -189,11 +193,11 @@ function buildProposal(instructions: string): AIConfigProposal {
       confidence: 82,
       warnings,
       config: {
-        publisherId: "{{publisher_id}}",
+        publisherId: publisherId || "{{publisher_id}}",
         postingUrl: url || "https://mock-ppcall.local/rtb/{{campaign_id}}/{{publisher_id}}",
         requiredFields: fields,
-        expiresInSeconds: expirationField ? 30 : type === "rtb" ? 30 : undefined,
-        acceptedResponse: { accepted: true, phone_number: "+18005551212", payout: 35, expires_in_seconds: 30 },
+        expiresInSeconds: expirationField || type === "rtb" ? expiresInSeconds : undefined,
+        acceptedResponse: { accepted: true, phone_number: "+18005551212", payout: 35, expires_in_seconds: expiresInSeconds },
         rejectedResponse: { accepted: false, reason: "no_buyer_available" }
       }
     };

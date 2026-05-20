@@ -30,24 +30,24 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 h-screen sticky top-0 flex flex-col border-r border-slate-800">
-      <div className="p-6">
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
+    <aside className="w-full bg-slate-900 text-slate-300 md:h-screen md:w-64 md:sticky md:top-0 flex flex-col border-r border-slate-800">
+      <div className="p-4 md:p-6">
+        <h1 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
           <Zap className="text-purple-500 fill-purple-500" size={24} />
           <span>PPCall Studio</span>
         </h1>
       </div>
       
-      <nav className="flex-1 px-4 py-4">
-        <ul className="space-y-1">
+      <nav className="px-4 pb-4 md:flex-1 md:py-4 overflow-x-auto">
+        <ul className="flex gap-2 md:block md:space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
             return (
-              <li key={item.id}>
+              <li key={item.id} className="shrink-0 md:shrink">
                 <button
                   onClick={() => setView(item.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`w-full flex items-center gap-2 md:gap-3 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                     isActive 
                       ? "bg-purple-600 text-white" 
                       : "hover:bg-slate-800 hover:text-white text-slate-400"
@@ -62,7 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-slate-800 text-xs text-slate-500">
+      <div className="hidden md:block p-4 border-t border-slate-800 text-xs text-slate-500">
         <p>Mock Environment v1.0</p>
         <p>© 2026 Self-Service PPCall Integration Studio</p>
       </div>
