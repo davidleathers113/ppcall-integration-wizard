@@ -44,7 +44,7 @@ function App() {
           <IntegrationDetail integrationId={selectedIntegrationId} onBack={() => setView('integrations')} />
         ) : <IntegrationList onSelectIntegration={handleSelectIntegration} />
       case 'add-integration':
-        return <AddIntegrationWizard onComplete={(id) => handleSelectIntegration(id)} />
+        return <AddIntegrationWizard onComplete={(id) => id ? handleSelectIntegration(id) : setView('integrations')} />
       case 'bulk-import':
         return <BulkImport />
       case 'test-console':

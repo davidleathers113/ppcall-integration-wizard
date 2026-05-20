@@ -3,65 +3,80 @@ import { Upload, AlertCircle, CheckCircle, FileText, Download } from "lucide-rea
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
-import type { IntegrationDirection, IntegrationType, IntegrationStatus } from "../../models/appTypes";
+import { validateImports, type ValidationResult } from "../../utils/importParser";
+import type { Integration } from "../../models/appTypes";
 
 const BulkImport: React.FC = () => {
   const { state, dispatch } = useAppContext();
   const [importType, setImportType] = useState<"csv" | "json">("csv");
   const [content, setContent] = useState("");
-  const [isValidated, setIsValidated] = useState(false);
-
-  // Simplified logic for prototype purposes
-  const mockValidationResults = [
-    { row: 1, name: "Premier Home Services", status: "ready", message: "Ready to import" },
-    { row: 2, name: "Coastal Plumbing", status: "ready", message: "Ready to import" },
-    { row: 3, name: "Disability Intake", status: "warning", message: "Missing timeout; defaulting to 3s" },
-    { row: 4, name: "Unknown Buyer", status: "error", message: "Missing required field: URL" },
-  ];
+  const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   const handleValidate = () => {
     if (content.trim()) {
-      setIsValidated(true);
+      setValidationResults(validateImports(content, importType, state.campaigns.map(campaign => campaign.id)));
+      setImportMessage(null);
     }
   };
 
   const handleImport = () => {
-    // In a real flow, this would parse content and dispatch mapped objects
-    const mockIntegration = {
-      id: `int_${Math.random().toString(36).substr(2, 9)}`,
-      campaignId: state.campaigns[0].id,
-      name: "Imported Integration " + Math.floor(Math.random() * 100),
-      direction: "buyer" as IntegrationDirection,
-      type: "rtb" as IntegrationType,
-      platformPreset: "ringba_rtb",
-      status: "needs_testing" as IntegrationStatus,
-      config: { url: "https://api.imported.com/ping" },
-      createdAt: new Date().toISOString(),
-      createdBy: "Bulk Importer",
-      updatedAt: new Date().toISOString(),
-      updatedBy: "Bulk Importer",
-      usageCount: 0,
-      errorRate: 0
-    };
+    const importableRows = validationResults.filter(result => result.status !== "error" && result.parsedData);
+    if (importableRows.length === 0) {
+      setImportMessage("No valid rows are ready to import.");
+      return;
+    }
+
+    const importedIntegrations: Integration[] = importableRows.map(result => {
+      const now = new Date().toISOString();
+      return {
+        id: `int_${Math.random().toString(36).substr(2, 9)}`,
+        campaignId: result.parsedData!.campaignId!,
+        name: result.parsedData!.name!,
+        direction: result.parsedData!.direction!,
+        type: result.parsedData!.type!,
+        platformPreset: result.parsedData!.platformPreset || "custom",
+        status: result.parsedData!.status || "draft",
+        config: result.parsedData!.config || {},
+        createdAt: now,
+        createdBy: "Bulk Importer",
+        updatedAt: now,
+        updatedBy: "Bulk Importer",
+        usageCount: 0,
+        errorRate: 0
+      };
+    });
     
-    dispatch({ type: "CREATE_INTEGRATION", payload: mockIntegration });
-    dispatch({
-      type: "ADD_ACTIVITY",
-      payload: {
+    dispatch({ type: "BULK_IMPORT", payload: importedIntegrations });
+    importedIntegrations.forEach(integration => {
+      dispatch({
+        type: "ADD_ACTIVITY",
+        payload: {
         id: `evt_${Math.random().toString(36).substr(2, 9)}`,
-        integrationId: mockIntegration.id,
-        campaignId: mockIntegration.campaignId,
+        integrationId: integration.id,
+        campaignId: integration.campaignId,
         eventType: "created",
-        message: "Imported integration via Bulk CSV/JSON import.",
+        message: `Imported ${integration.name} via Bulk CSV/JSON import.`,
         createdAt: new Date().toISOString(),
         actor: "Bulk Importer"
-      }
+        }
+      });
     });
 
     setContent("");
-    setIsValidated(false);
-    alert("Import successful! (Simulated)");
+    setValidationResults([]);
+    setImportMessage(`Imported ${importedIntegrations.length} integration${importedIntegrations.length === 1 ? "" : "s"}.`);
   };
+
+  const handleDownloadTemplate = () => {
+    const template = "integration_name,type,direction,campaign_id,url,method,platform_preset,timeout_seconds,destination_number,payout\nPremier RTB,rtb,buyer,camp_hvac,https://buyer.example/ping,POST,ringba_rtb,3,,\nStatic Buyer,static_number,buyer,camp_hvac,,,,,+18005551212,25";
+    void navigator.clipboard.writeText(template);
+    setImportMessage("Template copied to clipboard.");
+  };
+
+  const readyCount = validationResults.filter(result => result.status === "ready").length;
+  const warningCount = validationResults.filter(result => result.status === "warning").length;
+  const errorCount = validationResults.filter(result => result.status === "error").length;
 
   return (
     <div className="space-y-6">
@@ -70,9 +85,9 @@ const BulkImport: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">Bulk Import</h2>
           <p className="text-slate-500">Add multiple integrations at once via CSV or JSON.</p>
         </div>
-        <button className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1">
+        <button onClick={handleDownloadTemplate} className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1">
           <Download size={16} />
-          Download Template
+          Copy Template
         </button>
       </header>
 
@@ -122,10 +137,16 @@ const BulkImport: React.FC = () => {
             </div>
           </Card>
 
-          {isValidated && (
+          {importMessage && (
+            <div className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">
+              {importMessage}
+            </div>
+          )}
+
+          {validationResults.length > 0 && (
             <Card title="Validation Results" subtitle="Review issues before importing">
               <div className="space-y-2">
-                {mockValidationResults.map((res, i) => (
+                {validationResults.map((res, i) => (
                   <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                     <div className="flex items-center gap-3">
                       <span className="text-[10px] font-bold text-slate-400 w-4">#{res.row}</span>
@@ -145,10 +166,11 @@ const BulkImport: React.FC = () => {
               <div className="mt-6 p-4 bg-purple-50 rounded-xl border border-purple-100 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-bold text-purple-900">Summary</p>
-                  <p className="text-xs text-purple-700">2 ready, 1 warning, 1 error</p>
+                  <p className="text-xs text-purple-700">{readyCount} ready, {warningCount} warning, {errorCount} error</p>
                 </div>
                 <button 
                   onClick={handleImport}
+                  disabled={readyCount + warningCount === 0}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-700"
                 >
                   Import Valid Rows

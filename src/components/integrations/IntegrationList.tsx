@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, ArrowLeft, MoreVertical, Terminal, ExternalLink } from "lucide-react";
+import { ArrowRight, ArrowLeft, Terminal, ExternalLink } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { calculateFreshnessStatus } from "../../utils/freshness";
@@ -72,9 +72,6 @@ const IntegrationList: React.FC<IntegrationListProps> = ({ onSelectIntegration }
                         className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
                       >
                         <ExternalLink size={16} />
-                      </button>
-                      <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-                        <MoreVertical size={16} />
                       </button>
                     </div>
                   </td>

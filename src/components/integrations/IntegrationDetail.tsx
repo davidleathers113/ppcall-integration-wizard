@@ -6,12 +6,15 @@ import {
   Settings,
   Code,
   FileText,
-  Activity
+  Activity,
+  Pause,
+  Archive,
+  Play
 } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { calculateFreshnessStatus, getDaysSince } from "../../utils/freshness";
-import { useAppContext } from "../../store/AppStore";
+import { createActivity, useAppContext } from "../../store/AppStore";
 import BuyerConfigForm from "./BuyerConfigForm";
 import RawJsonEditor from "./RawJsonEditor";
 import PublisherInstructions from "./PublisherInstructions";
@@ -23,8 +26,9 @@ interface IntegrationDetailProps {
 }
 
 const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, onBack }) => {
-  const { state } = useAppContext();
+  const { state, dispatch } = useAppContext();
   const [activeTab, setActiveTab] = useState("overview");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const integration = state.integrations.find(i => i.id === integrationId);
 
@@ -32,6 +36,39 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
 
   const currentStatus = calculateFreshnessStatus(integration);
   const isPublisher = integration.direction === "publisher";
+  const latestTestRun = state.testRuns
+    .filter(testRun => testRun.integrationId === integration.id)
+    .toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+  const addActivity = (eventType: "activated" | "paused" | "archived", message: string) => {
+    dispatch({
+      type: "ADD_ACTIVITY",
+      payload: createActivity(integration.id, integration.campaignId, eventType, message)
+    });
+  };
+
+  const handleActivate = () => {
+    if (latestTestRun?.status !== "passed") {
+      setActionMessage("Activation blocked: run and pass a stored integration test first.");
+      return;
+    }
+
+    dispatch({ type: "ACTIVATE_INTEGRATION", payload: integration.id });
+    addActivity("activated", `Activated ${integration.name}.`);
+    setActionMessage("Integration activated.");
+  };
+
+  const handlePause = () => {
+    dispatch({ type: "PAUSE_INTEGRATION", payload: integration.id });
+    addActivity("paused", `Paused ${integration.name}.`);
+    setActionMessage("Integration paused.");
+  };
+
+  const handleArchive = () => {
+    dispatch({ type: "ARCHIVE_INTEGRATION", payload: integration.id });
+    addActivity("archived", `Archived ${integration.name}.`);
+    setActionMessage("Integration archived.");
+  };
 
   const tabs = [
     { id: "overview", label: "Overview", icon: Activity },
@@ -153,7 +190,8 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center gap-4">
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
         <button 
           onClick={onBack}
           className="p-2 hover:bg-slate-200 rounded-full transition-colors"
@@ -167,7 +205,37 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
           </div>
           <p className="text-slate-500 text-sm font-mono mt-1">{integration.id}</p>
         </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleActivate}
+            disabled={integration.status === "active" || integration.status === "archived"}
+            className="px-3 py-2 text-xs font-bold bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-slate-200 disabled:text-slate-500 flex items-center gap-1"
+          >
+            <Play size={14} /> Activate
+          </button>
+          <button
+            onClick={handlePause}
+            disabled={integration.status === "paused" || integration.status === "archived"}
+            className="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 disabled:opacity-50 flex items-center gap-1"
+          >
+            <Pause size={14} /> Pause
+          </button>
+          <button
+            onClick={handleArchive}
+            disabled={integration.status === "archived"}
+            className="px-3 py-2 text-xs font-bold bg-red-50 text-red-700 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center gap-1"
+          >
+            <Archive size={14} /> Archive
+          </button>
+        </div>
       </header>
+
+      {actionMessage && (
+        <div className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">
+          {actionMessage}
+        </div>
+      )}
 
       <div className="flex border-b border-slate-200 overflow-x-auto">
         {tabs.map(tab => {

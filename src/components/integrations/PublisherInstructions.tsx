@@ -11,7 +11,7 @@ const PublisherInstructions: React.FC<PublisherInstructionsProps> = ({ integrati
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -42,8 +42,8 @@ const PublisherInstructions: React.FC<PublisherInstructionsProps> = ({ integrati
           <h3 className="text-sm font-bold text-slate-900">Integration Guidelines</h3>
           <p className="text-xs text-slate-500">Provide these instructions to your publisher to begin receiving traffic.</p>
         </div>
-        <button className="px-3 py-1.5 text-xs font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 flex items-center gap-1">
-          <Download size={14} /> Download .md
+        <button onClick={() => handleCopy("markdown", instructionsJson)} className="px-3 py-1.5 text-xs font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 flex items-center gap-1">
+          {copiedId === "markdown" ? <Check size={14} /> : <Download size={14} />} Copy .md
         </button>
       </div>
 

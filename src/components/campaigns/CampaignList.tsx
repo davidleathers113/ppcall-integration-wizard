@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, MoreVertical, ExternalLink } from "lucide-react";
+import { Plus, ExternalLink } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
 import { useAppContext } from "../../store/AppStore";
@@ -9,7 +9,22 @@ interface CampaignListProps {
 }
 
 const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
-  const { state } = useAppContext();
+  const { state, dispatch } = useAppContext();
+
+  const handleCreateCampaign = () => {
+    const now = new Date().toISOString();
+    const campaignNumber = state.campaigns.length + 1;
+    dispatch({
+      type: "CREATE_CAMPAIGN",
+      payload: {
+        id: `camp_mock_${campaignNumber}`,
+        name: `New Mock Campaign ${campaignNumber}`,
+        vertical: "General",
+        status: "draft",
+        createdAt: now
+      }
+    });
+  };
   
   return (
     <div className="space-y-6">
@@ -18,7 +33,7 @@ const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
           <h2 className="text-2xl font-bold text-slate-900">Campaigns</h2>
           <p className="text-slate-500">Manage your PPCall campaigns and their routing configurations.</p>
         </div>
-        <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+        <button onClick={handleCreateCampaign} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
           <Plus size={18} />
           Create Campaign
         </button>
@@ -73,9 +88,6 @@ const CampaignList: React.FC<CampaignListProps> = ({ onSelectCampaign }) => {
                           className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
                         >
                           <ExternalLink size={16} />
-                        </button>
-                        <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-                          <MoreVertical size={16} />
                         </button>
                       </div>
                     </td>

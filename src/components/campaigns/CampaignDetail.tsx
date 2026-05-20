@@ -85,7 +85,6 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
                     <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -97,11 +96,6 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant={calculateFreshnessStatus(int)}>{calculateFreshnessStatus(int)}</Badge>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-xs text-purple-600 font-bold hover:underline">
-                          {activeTab === "publishers" ? "Get Instructions" : "Configure"}
-                        </button>
                       </td>
                     </tr>
                   ))}
@@ -146,9 +140,33 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onBack }) =
                   <Badge variant="active">Active</Badge>
                 </div>
               ))}
-              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm italic">
-                Add fallback destination...
+              <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-sm">
+                Fallback routing is not implemented in this mock prototype.
               </div>
+            </div>
+          </Card>
+        );
+      case "tests":
+        return (
+          <Card title="Recent Tests">
+            <div className="space-y-3">
+              {state.testRuns
+                .filter(testRun => integrations.some(integration => integration.id === testRun.integrationId))
+                .map(testRun => {
+                  const integration = integrations.find(item => item.id === testRun.integrationId);
+                  return (
+                    <div key={testRun.id} className="p-3 border border-slate-100 rounded-lg flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{integration?.name || testRun.integrationId}</p>
+                        <p className="text-[10px] text-slate-400">{new Date(testRun.createdAt).toLocaleString()} • {testRun.responseTimeMs}ms</p>
+                      </div>
+                      <Badge variant={testRun.status === "passed" ? "success" : "error"}>{testRun.status}</Badge>
+                    </div>
+                  );
+                })}
+              {state.testRuns.filter(testRun => integrations.some(integration => integration.id === testRun.integrationId)).length === 0 && (
+                <div className="text-center text-slate-500 text-sm py-4">No tests have been run for this campaign yet.</div>
+              )}
             </div>
           </Card>
         );

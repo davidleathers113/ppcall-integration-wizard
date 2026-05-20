@@ -120,6 +120,7 @@ export interface ActivityEvent {
     | "used"
     | "failed"
     | "paused"
+    | "archived"
     | "marked_stale";
   message: string;
   createdAt: string;

@@ -1,4 +1,4 @@
-import type { IntegrationDirection, IntegrationType, IntegrationStatus, Integration } from "../models/appTypes";
+import type { IntegrationDirection, IntegrationType, IntegrationStatus, Integration, IntegrationConfig } from "../models/appTypes";
 import { PRESETS } from "../data/mockData";
 
 export interface ValidationResult {
@@ -60,7 +60,7 @@ export function validateImports(content: string, type: "csv" | "json", existingC
       parsed.forEach((item: Record<string, string>, index) => {
         validateRow(item, index + 1, existingCampaigns, results);
       });
-    } catch (e: unknown) {
+    } catch {
       return [{ row: 0, name: "JSON", status: "error", message: "Invalid JSON format" }];
     }
   }
@@ -106,8 +106,8 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
     parsedTimeout = parseInt(timeout, 10);
   }
 
-  let configUrl = record.url || "";
-  let configMethod = record.method || "POST";
+  const configUrl = record.url || "";
+  const configMethod = record.method || "POST";
   
   if (direction === "buyer" && (integrationType === "rtb" || integrationType === "generic_api" || integrationType === "webhook")) {
     if (!configUrl) {
@@ -117,7 +117,7 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
   }
 
   const preset = record.platform_preset || record.preset;
-  let baseConfig = {};
+  let baseConfig: IntegrationConfig = {};
   if (preset && PRESETS[preset]) {
     baseConfig = { ...PRESETS[preset].config };
   } else if (preset) {
@@ -126,11 +126,11 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
   }
 
   if (status !== "error") {
-    const finalConfig = {
+    const finalConfig: IntegrationConfig = {
       ...baseConfig,
       timeoutSeconds: parsedTimeout,
       ...(configUrl ? { url: configUrl } : {}),
-      ...(configMethod ? { method: configMethod as any } : {}),
+      ...(isHttpMethod(configMethod) ? { method: configMethod } : {}),
       ...(record.destination_number ? { destinationNumber: record.destination_number } : {}),
       ...(record.payout ? { payout: parseFloat(record.payout) } : {})
     };
@@ -153,4 +153,8 @@ function validateRow(record: Record<string, string>, rowIndex: number, existingC
   } else {
     results.push({ row: rowIndex, name, status, message });
   }
+}
+
+function isHttpMethod(value: string): value is NonNullable<IntegrationConfig["method"]> {
+  return value === "GET" || value === "POST";
 }

@@ -19,6 +19,7 @@ const AIAssistant: React.FC = () => {
   const [instructions, setInstructions] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [proposedConfig, setProposedConfig] = useState<AIConfigProposal | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleAnalyze = () => {
     setIsAnalyzing(true);
@@ -91,7 +92,13 @@ const AIAssistant: React.FC = () => {
         actor: "AI Assistant"
       }
     });
-    alert("Draft integration created from AI proposal!");
+    setMessage("Draft integration created from AI proposal.");
+  };
+
+  const handleCopyProposal = () => {
+    if (!proposedConfig) return;
+    void navigator.clipboard.writeText(JSON.stringify(proposedConfig, null, 2));
+    setMessage("Proposed JSON copied to clipboard.");
   };
 
   return (
@@ -100,6 +107,12 @@ const AIAssistant: React.FC = () => {
         <h2 className="text-2xl font-bold text-slate-900">AI Integration Assistant</h2>
         <p className="text-slate-500">Paste your buyer or publisher instructions and let AI generate the configuration.</p>
       </header>
+
+      {message && (
+        <div className="p-3 rounded-lg border border-blue-100 bg-blue-50 text-blue-800 text-sm">
+          {message}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
@@ -164,7 +177,7 @@ const AIAssistant: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">JSON Definition</p>
-                      <button className="text-[10px] text-purple-600 hover:underline flex items-center gap-1">
+                      <button onClick={handleCopyProposal} className="text-[10px] text-purple-600 hover:underline flex items-center gap-1">
                         <FileCode size={12} />
                         Copy JSON
                       </button>

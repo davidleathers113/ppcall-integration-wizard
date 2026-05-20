@@ -35,8 +35,9 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
 
-  const handleActivate = () => {
+  const handleSaveDraft = () => {
     const id = `int_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
     const newInt: Integration = {
       id,
       campaignId: campaignId || state.campaigns[0].id,
@@ -44,13 +45,12 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
       direction: direction as IntegrationDirection,
       type: type as IntegrationType,
       platformPreset: "custom",
-      status: "active",
+      status: "draft",
       config: formData as IntegrationConfig,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
       createdBy: "User",
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
       updatedBy: "User",
-      activatedAt: new Date().toISOString(),
       usageCount: 0,
       errorRate: 0
     };
@@ -63,8 +63,8 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
         integrationId: id,
         campaignId: newInt.campaignId,
         eventType: "created",
-        message: `Created and activated ${newInt.name}.`,
-        createdAt: new Date().toISOString(),
+        message: `Created draft integration ${newInt.name}.`,
+        createdAt: now,
         actor: "User"
       }
     });
@@ -240,10 +240,10 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
               </div>
             </div>
             <button 
-              onClick={handleActivate}
+              onClick={handleSaveDraft}
               className="w-full bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors"
             >
-              Finish and Activate
+              Save Draft Integration
             </button>
           </div>
         );
@@ -253,9 +253,9 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-6">
               <ShieldCheck size={48} />
             </div>
-            <h3 className="text-2xl font-bold text-slate-900">Integration Ready!</h3>
+            <h3 className="text-2xl font-bold text-slate-900">Draft Integration Saved</h3>
             <p className="text-slate-500">
-              The integration has passed all verification checks and is now active.
+              The normalized configuration is saved. Run a stored test from the detail page before activation.
             </p>
             <div className="flex gap-4 pt-4">
               <button 
@@ -268,7 +268,7 @@ const AddIntegrationWizard: React.FC<AddIntegrationWizardProps> = ({ onComplete 
                 onClick={() => { if (onComplete) onComplete(''); }}
                 className="flex-1 bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
               >
-                Back to Dashboard
+                Back to Integrations
               </button>
             </div>
           </div>
