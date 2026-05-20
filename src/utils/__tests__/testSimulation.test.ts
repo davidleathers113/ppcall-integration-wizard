@@ -149,4 +149,112 @@ describe("simulateIntegrationTest", () => {
     const run = simulateIntegrationTest(integration(legacyConfig));
     expect(run.status).toBe("passed");
   });
+
+  describe("direct target simulation", () => {
+    const validDirectNumber: IntegrationConfig = {
+      buyerDestinationKind: "direct_number",
+      destinationMode: "static_number",
+      destination: { number: "+18005551212" },
+      destinationNumber: "+18005551212",
+      payout: 35,
+      conversionDurationSeconds: 120,
+      callHandling: { connectionTimeoutSeconds: 30 },
+      schedule: {
+        timezone: "America/New_York",
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        startTime: "09:00",
+        endTime: "17:00",
+        mode: "basic",
+      },
+      caps: { capOn: "converted_calls", daily: 100, concurrency: 5 },
+    };
+
+    const validDirectSip: IntegrationConfig = {
+      ...validDirectNumber,
+      buyerDestinationKind: "direct_sip",
+      destinationMode: "static_sip",
+      destination: { sipAddress: "sip:buyer@example.com", sipHeaders: { "X-Buyer": "acme" } },
+      destinationNumber: undefined,
+      sipAddress: "sip:buyer@example.com",
+    };
+
+    it("passes a valid Direct Number Target", () => {
+      const run = simulateIntegrationTest(integration(validDirectNumber, { type: "static_number" }));
+      expect(run.status).toBe("passed");
+      expect(run.checklist.some(item => item.label === "Destination number present")).toBe(true);
+      expect(run.checklist.some(item => item.label === "Destination number format valid")).toBe(true);
+      expect(run.checklist.some(item => item.label === "Activation readiness")).toBe(true);
+    });
+
+    it("emits no HTTP endpoint check for direct number", () => {
+      const run = simulateIntegrationTest(integration(validDirectNumber, { type: "static_number" }));
+      expect(run.checklist.some(item => item.label === "Endpoint URL present")).toBe(false);
+      expect(run.checklist.some(item => item.label === "HTTP Method selected")).toBe(false);
+      expect(run.checklist.some(item => item.label.startsWith("Accepted path"))).toBe(false);
+    });
+
+    it("fails when direct number is missing", () => {
+      const config = { ...validDirectNumber, destination: {}, destinationNumber: undefined };
+      const run = simulateIntegrationTest(integration(config, { type: "static_number" }));
+      expect(run.status).toBe("failed");
+    });
+
+    it("fails when direct number is invalid format", () => {
+      const config: IntegrationConfig = {
+        ...validDirectNumber,
+        destination: { number: "2223334444" },
+        destinationNumber: "2223334444",
+      };
+      const run = simulateIntegrationTest(integration(config, { type: "static_number" }));
+      expect(run.status).toBe("failed");
+    });
+
+    it("passes a valid Direct SIP Target and runs SIP checks", () => {
+      const run = simulateIntegrationTest(integration(validDirectSip, { type: "sip" }));
+      expect(run.status).toBe("passed");
+      expect(run.checklist.some(item => item.label === "SIP address present")).toBe(true);
+      expect(run.checklist.some(item => item.label === "SIP address format valid")).toBe(true);
+    });
+
+    it("fails when direct SIP is missing", () => {
+      const config: IntegrationConfig = {
+        ...validDirectSip,
+        destination: {},
+        sipAddress: undefined,
+      };
+      const run = simulateIntegrationTest(integration(config, { type: "sip" }));
+      expect(run.status).toBe("failed");
+    });
+
+    it("warns when no SIP headers configured", () => {
+      const config: IntegrationConfig = {
+        ...validDirectSip,
+        destination: { sipAddress: "sip:buyer@example.com" },
+      };
+      const run = simulateIntegrationTest(integration(config, { type: "sip" }));
+      const warn = run.checklist.find(item => item.label === "SIP headers configured");
+      expect(warn?.status).toBe("warning");
+    });
+
+    it("fails when current concurrency reaches the cap", () => {
+      const config: IntegrationConfig = {
+        ...validDirectNumber,
+        capUsage: { currentConcurrency: 5 },
+      };
+      const run = simulateIntegrationTest(integration(config, { type: "static_number" }));
+      expect(run.status).toBe("failed");
+      expect(
+        run.checklist.some(item => item.label === "Concurrency available" && item.status === "fail")
+      ).toBe(true);
+    });
+
+    it("request preview omits URL/method for direct targets", () => {
+      const run = simulateIntegrationTest(integration(validDirectNumber, { type: "static_number" }));
+      const preview = run.requestPreview as Record<string, unknown>;
+      expect(preview.url).toBeUndefined();
+      expect(preview.method).toBeUndefined();
+      expect(preview.buyer_destination_kind).toBe("direct_number");
+      expect(preview.destination).toBe("+18005551212");
+    });
+  });
 });
