@@ -49,6 +49,26 @@ npm run build
 - [ ] Created integration has correct status (draft/needs_testing, NOT active)
 - [ ] Navigation to integration detail works
 
+### Direct Target Mode (Buyer)
+- [ ] Wizard exposes "Direct Number Target" and "Direct SIP Target" type options when direction is Buyer
+- [ ] Direct Number wizard flow: destination number → payout + conversion duration → timezone + daily cap → Save Draft
+- [ ] Direct SIP wizard flow: SIP address → payout + conversion duration → timezone + daily cap → Save Draft
+- [ ] Direct targets do not show HTTP request URL / method / body fields in the wizard
+- [ ] Step 6 ("Response Parsing") shows the "No parsing required" message for direct targets
+- [ ] Saved direct target lands in `draft` (not `active`)
+- [ ] Toast: "Direct target draft created. Run a test before activation."
+- [ ] Configure tab on a direct target shows: Destination, Call Handling, Caps & Schedule, Duplicate Rules, Revenue Recovery, Shareable Tags, Predictive Routing
+- [ ] Configure tab does NOT show: Request, Response Parsing, Filters, Revenue & Errors, Advanced Call Behavior
+- [ ] Configure tab on an RTB target still shows the full RTB section set
+- [ ] Test console for a direct target checklist mentions destination, timezone, caps, payout, conversion duration; it does NOT mention endpoint URL or response parsing
+- [ ] Test console request preview for a direct target shows `buyer_destination_kind` and `destination` (not `url` / `method`)
+- [ ] CSV import: direct number and direct SIP templates round-trip through the bulk import flow
+- [ ] CSV import: a direct target row with `status=active` is downgraded to `needs_testing` with a warning
+- [ ] AI Assistant: "Send calls to +18005551212. Buyer pays $35 after 120 seconds. Hours Monday through Friday 8am to 6pm Eastern. Daily cap is 100." produces a direct_number proposal
+- [ ] AI Assistant: "Route to SIP sip:intake@buyer.example.com with max concurrency 5 and daily cap 50." produces a direct_sip proposal
+- [ ] Raw JSON editor: editing the destination number on a direct target marks it `needs_retest`
+- [ ] Activation: a direct target cannot be activated until a passing stored test exists
+
 ### Integration Detail
 - [ ] Overview tab displays all fields
 - [ ] Configure tab shows form fields

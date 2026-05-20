@@ -603,7 +603,7 @@ function extractScheduleHints(text: string): IntegrationSchedule | undefined {
   if (lower.includes("sunday")) days.push("Sun");
 
   // Hours like "8am to 6pm".
-  const startTime = extractTime(text, ["from ", "open "]) ?? extractTime(text, [" "]);
+  const startTime = extractTime(text);
   const endTime = extractEndTime(text);
 
   if (!days.length && !startTime && !endTime && !lower.includes("eastern") && !lower.includes("hours")) {
@@ -619,7 +619,7 @@ function extractScheduleHints(text: string): IntegrationSchedule | undefined {
   };
 }
 
-function extractTime(text: string, _prefixes: string[]): string | undefined {
+function extractTime(text: string): string | undefined {
   const lower = text.toLowerCase();
   // Find first "am" or "pm" occurrence and walk back to find the hour digits.
   const ampm = ["am", "pm"];
@@ -630,7 +630,7 @@ function extractTime(text: string, _prefixes: string[]): string | undefined {
     let cursor = idx - 1;
     while (cursor >= 0 && text[cursor] === " ") cursor--;
     // Read digits backward.
-    let digitsEnd = cursor + 1;
+    const digitsEnd = cursor + 1;
     while (cursor >= 0 && (isDigitChar(text[cursor]) || text[cursor] === ":")) cursor--;
     const numStr = text.substring(cursor + 1, digitsEnd);
     if (numStr.length === 0) continue;
@@ -646,7 +646,7 @@ function extractEndTime(text: string): string | undefined {
   if (toIdx === -1) return undefined;
   // Look for time after " to ".
   const subText = text.substring(toIdx + 4);
-  return extractTime(subText, []);
+  return extractTime(subText);
 }
 
 function formatHourString(numStr: string, ampm: "am" | "pm"): string | undefined {

@@ -102,11 +102,10 @@ export function validateSipAddress(value: string): ValidationResult {
     return { valid: false, message: "SIP address must include a host after the scheme." };
   }
   // user@host:port — but only host is required.
-  let userPortion = "";
   let hostPortion = rest;
   const atIndex = rest.indexOf("@");
   if (atIndex !== -1) {
-    userPortion = rest.substring(0, atIndex);
+    const userPortion = rest.substring(0, atIndex);
     hostPortion = rest.substring(atIndex + 1);
     if (userPortion.length === 0) {
       return { valid: false, message: "SIP user portion before '@' must not be empty." };

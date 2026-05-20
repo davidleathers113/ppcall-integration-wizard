@@ -45,10 +45,10 @@ test.describe('Integration Wizard Flow', () => {
     await expect(continueButton).toBeEnabled();
     await continueButton.click();
 
-    // Now on type step
+    // Now on type step — buyer-direction options surface as direct/RTB labels.
     await expect(page.getByTestId('wizard-type-rtb')).toBeVisible();
-    await expect(page.getByTestId('wizard-type-static-number')).toBeVisible();
-    await expect(page.getByTestId('wizard-type-sip')).toBeVisible();
+    await expect(page.getByTestId('wizard-type-direct-number')).toBeVisible();
+    await expect(page.getByTestId('wizard-type-direct-sip')).toBeVisible();
     await expect(page.getByTestId('wizard-type-webhook')).toBeVisible();
   });
 });
