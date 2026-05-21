@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { 
-  Terminal, 
-  History, 
+import {
+  Terminal,
+  History,
   ChevronLeft,
   Settings,
   Code,
@@ -10,7 +10,8 @@ import {
   Pause,
   Archive,
   Play,
-  Gauge
+  Gauge,
+  Link2
 } from "lucide-react";
 import Card from "../shared/Card";
 import Badge from "../shared/Badge";
@@ -23,6 +24,7 @@ import { useToast } from "../shared/ToastProvider";
 import BuyerConfigForm from "./BuyerConfigForm";
 import RawJsonEditor from "./RawJsonEditor";
 import PublisherInstructions from "./PublisherInstructions";
+import ShareLinkPanel from "./ShareLinkPanel";
 import TestConsole from "../test-console/TestConsole";
 
 interface IntegrationDetailProps {
@@ -76,7 +78,12 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
     { id: "configure", label: "Configure", icon: Settings },
     { id: "raw-json", label: "Raw JSON", icon: Code },
     { id: "test-console", label: "Test Console", icon: Terminal },
-    ...(isPublisher ? [{ id: "publisher-instructions", label: "Instructions", icon: FileText }] : []),
+    ...(isPublisher
+      ? [
+          { id: "share-link", label: "Publisher Link", icon: Link2 },
+          { id: "publisher-instructions", label: "Instructions", icon: FileText }
+        ]
+      : []),
     { id: "activity", label: "Activity", icon: History },
   ];
 
@@ -198,6 +205,8 @@ const IntegrationDetail: React.FC<IntegrationDetailProps> = ({ integrationId, on
             <TestConsole overrideIntegrationId={integration.id} />
           </Card>
         );
+      case "share-link":
+        return <ShareLinkPanel integration={integration} />;
       case "publisher-instructions":
         return <PublisherInstructions integration={integration} />;
       case "activity":

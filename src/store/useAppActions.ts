@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import type { ActivityEvent, BuyerTarget, Campaign, Integration, IntegrationConfig, PublisherSource, TestRun } from "../models/appTypes";
+import type { ActivityEvent, BuyerTarget, Campaign, Integration, IntegrationConfig, PublisherSource, ShareableSpecConfig, TestRun } from "../models/appTypes";
 import { nowIso } from "../utils/clock";
 import { createId } from "../utils/id";
+import { generateShareSlug } from "../utils/specRender";
 import { simulateIntegrationTest } from "../utils/testSimulation";
 import { createInitialState } from "./appReducer";
 import { selectIntegrationById, selectLatestTestRunForIntegration } from "./selectors";
@@ -283,6 +284,57 @@ export function useAppActions() {
       const at = nowIso();
       dispatch({ type: "MARK_USED", payload: { integrationId: id, at } });
       dispatch({ type: "ADD_ACTIVITY", payload: activity(integration, "used", `Marked ${integration.name} as used in mock traffic.`, "System", at) });
+    },
+
+    createShareLink(
+      integrationId: string,
+      options: { defaultSourceId?: string; notes?: string; endpointOverride?: string; expiresAt?: string } = {},
+      meta: ActionMeta = {}
+    ) {
+      const integration = selectIntegrationById(state, integrationId);
+      if (!integration) return undefined;
+      const at = nowIso();
+      const actor = meta.actor || "User";
+      const spec: ShareableSpecConfig = {
+        slug: generateShareSlug(integration.name),
+        createdAt: at,
+        createdBy: actor,
+        defaultSourceId: options.defaultSourceId,
+        notes: options.notes,
+        endpointOverride: options.endpointOverride,
+        expiresAt: options.expiresAt
+      };
+      dispatch({ type: "CREATE_SHARE_LINK", payload: { integrationId, spec, at, actor } });
+      dispatch({
+        type: "ADD_ACTIVITY",
+        payload: activity(
+          integration,
+          "updated",
+          meta.message || `Generated publisher share link (${spec.slug}).`,
+          actor,
+          at
+        )
+      });
+      return spec;
+    },
+
+    revokeShareLink(integrationId: string, meta: ActionMeta = {}) {
+      const integration = selectIntegrationById(state, integrationId);
+      if (!integration || !integration.config.shareableSpec) return undefined;
+      const at = nowIso();
+      const actor = meta.actor || "User";
+      dispatch({ type: "REVOKE_SHARE_LINK", payload: { integrationId, at, actor } });
+      dispatch({
+        type: "ADD_ACTIVITY",
+        payload: activity(
+          integration,
+          "updated",
+          meta.message || `Revoked publisher share link.`,
+          actor,
+          at
+        )
+      });
+      return at;
     },
 
     resetMockData() {

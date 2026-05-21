@@ -1,4 +1,4 @@
-import type { ActivityEvent, Campaign, Integration, TestRun } from "../models/appTypes";
+import type { ActivityEvent, Campaign, Integration, ShareableSpecConfig, TestRun } from "../models/appTypes";
 import { MOCK_ACTIVITY, MOCK_CAMPAIGNS, MOCK_INTEGRATIONS } from "../data/mockData";
 
 export interface AppState {
@@ -27,6 +27,8 @@ export type AppAction =
   | { type: "BULK_IMPORT"; payload: Integration[] }
   | { type: "MARK_USED"; payload: { integrationId: string; at: string } }
   | { type: "ADD_ACTIVITY"; payload: ActivityEvent }
+  | { type: "CREATE_SHARE_LINK"; payload: { integrationId: string; spec: ShareableSpecConfig; at: string; actor: string } }
+  | { type: "REVOKE_SHARE_LINK"; payload: { integrationId: string; at: string; actor: string } }
   | { type: "RESET_DATA" }
   | { type: "HYDRATE"; payload: AppState };
 
@@ -107,6 +109,38 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
     case "ADD_ACTIVITY":
       return { ...state, activityEvents: [action.payload, ...state.activityEvents] };
+    case "CREATE_SHARE_LINK":
+      return {
+        ...state,
+        integrations: state.integrations.map(integration =>
+          integration.id === action.payload.integrationId
+            ? {
+                ...integration,
+                config: { ...integration.config, shareableSpec: action.payload.spec },
+                updatedAt: action.payload.at,
+                updatedBy: action.payload.actor
+              }
+            : integration
+        )
+      };
+    case "REVOKE_SHARE_LINK":
+      return {
+        ...state,
+        integrations: state.integrations.map(integration => {
+          if (integration.id !== action.payload.integrationId) return integration;
+          const existing = integration.config.shareableSpec;
+          if (!existing) return integration;
+          return {
+            ...integration,
+            config: {
+              ...integration.config,
+              shareableSpec: { ...existing, revokedAt: action.payload.at }
+            },
+            updatedAt: action.payload.at,
+            updatedBy: action.payload.actor
+          };
+        })
+      };
     case "RESET_DATA":
       return createInitialState();
     case "HYDRATE":

@@ -53,4 +53,41 @@ describe("appReducer", () => {
     expect(used.integrations[0].usageCount).toBe(state.integrations[0].usageCount + 1);
     expect(appReducer(used, { type: "RESET_DATA" }).testRuns).toHaveLength(0);
   });
+
+  it("creates and revokes a publisher share link", () => {
+    const state = createInitialState();
+    const integrationId = state.integrations.find(item => item.direction === "publisher")!.id;
+    const created = appReducer(state, {
+      type: "CREATE_SHARE_LINK",
+      payload: {
+        integrationId,
+        spec: {
+          slug: "test-slug",
+          createdAt: "2026-05-20T00:00:00Z",
+          createdBy: "Tester"
+        },
+        at: "2026-05-20T00:00:00Z",
+        actor: "Tester"
+      }
+    });
+    const createdIntegration = created.integrations.find(item => item.id === integrationId);
+    expect(createdIntegration?.config.shareableSpec?.slug).toBe("test-slug");
+    expect(createdIntegration?.updatedBy).toBe("Tester");
+
+    const revoked = appReducer(created, {
+      type: "REVOKE_SHARE_LINK",
+      payload: { integrationId, at: "2026-05-20T01:00:00Z", actor: "Tester" }
+    });
+    expect(revoked.integrations.find(item => item.id === integrationId)?.config.shareableSpec?.revokedAt).toBe("2026-05-20T01:00:00Z");
+  });
+
+  it("REVOKE_SHARE_LINK is a no-op when no link exists", () => {
+    const state = createInitialState();
+    const integration = state.integrations.find(item => !item.config.shareableSpec)!;
+    const next = appReducer(state, {
+      type: "REVOKE_SHARE_LINK",
+      payload: { integrationId: integration.id, at: "2026-05-20T00:00:00Z", actor: "Tester" }
+    });
+    expect(next.integrations.find(item => item.id === integration.id)?.config.shareableSpec).toBeUndefined();
+  });
 });

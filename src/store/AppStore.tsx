@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { appReducer, createInitialState, type AppAction, type AppState } from "./appReducer";
 
 export const STORAGE_KEY = "ppcall_studio_state";
-export const STORAGE_VERSION = 5;
+export const STORAGE_VERSION = 6;
 
 interface PersistedState {
   version: number;

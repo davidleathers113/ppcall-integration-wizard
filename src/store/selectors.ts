@@ -7,6 +7,11 @@ export const selectCampaignById = (state: AppState, id: string) =>
 export const selectIntegrationById = (state: AppState, id: string) =>
   state.integrations.find(integration => integration.id === id);
 
+export const selectIntegrationByShareSlug = (state: AppState, slug: string) =>
+  state.integrations.find(
+    integration => integration.config.shareableSpec?.slug === slug
+  );
+
 export const selectIntegrationsByCampaign = (state: AppState, campaignId: string) =>
   state.integrations.filter(integration => integration.campaignId === campaignId);
 

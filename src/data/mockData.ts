@@ -219,6 +219,13 @@ export const MOCK_INTEGRATIONS: Integration[] = [
       publisherId: "pub_abc",
       requiredFields: ["caller_id", "zip"],
       expiresInSeconds: 30,
+      shareableSpec: {
+        slug: "abc-media-hvac-demo",
+        createdAt: "2026-05-01T09:00:00Z",
+        createdBy: "Sarah",
+        defaultSourceId: "src_abc_google",
+        notes: "Hi! Send each unique call once. The endpoint will respond within ~250ms with a routing destination. Reach out if anything looks off."
+      },
       publisherSources: [
         {
           id: "src_abc_google",

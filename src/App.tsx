@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from './components/layout/Sidebar'
 import Dashboard from './components/dashboard/Dashboard'
 import CampaignList from './components/campaigns/CampaignList'
@@ -11,19 +11,37 @@ import TestConsole from './components/test-console/TestConsole'
 import AIAssistant from './components/ai-assistant/AIAssistant'
 import DeveloperDocs from './components/developer/DeveloperDocs'
 import ActivityHistory from './components/activity/ActivityHistory'
+import PublisherSpecPage from './components/publisher-spec/PublisherSpecPage'
 import type { IntegrationDirection } from './models/appTypes'
+import { parseHashRoute, type HashRoute } from './utils/specRender'
 
 interface WizardContext {
   campaignId?: string
   direction?: IntegrationDirection
 }
 
+function readHashRoute(): HashRoute | null {
+  if (typeof window === 'undefined') return null
+  return parseHashRoute(window.location.hash)
+}
+
 function App() {
+  const [hashRoute, setHashRoute] = useState<HashRoute | null>(() => readHashRoute())
   const [currentView, setView] = useState('dashboard')
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null)
   const [wizardContext, setWizardContext] = useState<WizardContext>({})
   const [wizardReturnView, setWizardReturnView] = useState('integrations')
+
+  useEffect(() => {
+    const onHashChange = () => setHashRoute(readHashRoute())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  if (hashRoute?.type === 'publisher-spec') {
+    return <PublisherSpecPage slug={hashRoute.slug} sourceId={hashRoute.sourceId} />
+  }
 
   const handleSelectCampaign = (id: string) => {
     setSelectedCampaignId(id)

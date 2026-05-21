@@ -212,6 +212,18 @@ export interface DialIvrSettings {
   digits?: string;
 }
 
+export interface ShareableSpecConfig {
+  slug: string;
+  createdAt: string;
+  createdBy: string;
+  revokedAt?: string;
+  expiresAt?: string;
+  visibleFields?: string[];
+  endpointOverride?: string;
+  notes?: string;
+  defaultSourceId?: string;
+}
+
 export interface PublisherSource {
   id: string;
   name: string;
@@ -295,6 +307,7 @@ export interface IntegrationConfig {
   capUsage?: CapUsage;
   shareableTags?: ShareableTagsConfig;
   predictiveRouting?: PredictiveRoutingConfig;
+  shareableSpec?: ShareableSpecConfig;
 }
 
 export interface Integration {
